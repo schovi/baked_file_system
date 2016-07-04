@@ -1,4 +1,4 @@
-# baked_file_system
+# Baked File System
 
 Include (bake them) static files into your binary and access them anytime you need.
 
