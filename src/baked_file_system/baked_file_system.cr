@@ -1,6 +1,6 @@
 require "base64"
 
-module BakedFs
+module BakedFileSystem
   class NoSuchFileError < Exception
   end
 
@@ -49,19 +49,19 @@ module BakedFs
   end
 
   macro load(path, source = "")
-    extend BakedFs
+    extend BakedFileSystem
 
     @@original_path   = {{path}}
     @@original_source = {{source}}
 
-    @@files = [] of BakedFs::BakedFile
+    @@files = [] of BakedFileSystem::BakedFile
 
     source = {{ run("../loader", path, source).stringify }}
 
     source.each_line do |line|
       parts = line.split(",")
 
-      @@files << BakedFs::BakedFile.new(
+      @@files << BakedFileSystem::BakedFile.new(
         Base64.decode_string(parts[0]),
         Base64.decode_string(parts[1]),
         parts[2].to_i32,

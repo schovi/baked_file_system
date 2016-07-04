@@ -1,10 +1,10 @@
 require "./spec_helper"
 
 class Storage
-  BakedFs.load("./storage", __DIR__)
+  BakedFileSystem.load("./storage", __DIR__)
 end
 
-describe BakedFs do
+describe BakedFileSystem do
   it "load only files without hidden one" do
     Storage.files.size.should eq(2)
   end
@@ -16,7 +16,7 @@ describe BakedFs do
   end
 
   it "throw error for missing file" do
-    expect_raises(BakedFs::NoSuchFileError) do
+    expect_raises(BakedFileSystem::NoSuchFileError) do
       Storage.get("missing.file")
     end
   end

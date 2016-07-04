@@ -1,4 +1,4 @@
-# baked_fs
+# baked_file_system
 
 Include (bake them) static files into your binary and access them anytime you need.
 
@@ -9,8 +9,8 @@ Add this to your application's `shard.yml`:
 
 ```yaml
 dependencies:
-  baked_fs:
-    github: schovi/baked_fs
+  baked_file_system:
+    github: schovi/baked_file_system
 ```
 
 
@@ -19,7 +19,7 @@ dependencies:
 Load library with:
 
 ```crystal
-require "baked_fs"
+require "baked_file_system"
 
 ```
 
@@ -27,7 +27,7 @@ Load folder with absolute path
 
 ```crystal
 class FileStorage
-  BakedFs.load("/home/my_name/work/crystal_project/public")
+  BakedFileSystem.load("/home/my_name/work/crystal_project/public")
 end
 ```
 
@@ -39,7 +39,7 @@ This weird API is because how crystal macros and variable/constants resolving in
 
 ```crystal
 class FileStorage
-  BakedFs.load("../public", __DIR__)
+  BakedFileSystem.load("../public", __DIR__)
 end
 
 ```
@@ -56,14 +56,14 @@ file.mime    # returns mime type
 file.size    # returns size of original file
 ```
 
-When try to get missing file, BakedFs thows BakedFs::NoSuchFileError exception
+When try to get missing file, BakedFileSystem thows BakedFileSystem::NoSuchFileError exception
 
 ```crystal
 path = "missing/file"
 
 begin
   FileStorage.get(path)
-rescue BakedFs::NoSuchFileError
+rescue BakedFileSystem::NoSuchFileError
   puts "File #{path} is missing"
 end
 ```
@@ -74,7 +74,7 @@ TODO: Write development instructions here
 
 ## Contributing
 
-1. Fork it ( https://github.com/schovi/baked_fs/fork )
+1. Fork it ( https://github.com/schovi/baked_file_system/fork )
 2. Create your feature branch (git checkout -b my-new-feature)
 3. Commit your changes (git commit -am 'Add some feature')
 4. Push to the branch (git push origin my-new-feature)

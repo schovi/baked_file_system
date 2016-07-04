@@ -1,6 +1,6 @@
 require "base64"
 
-module BakedFs
+module BakedFileSystem
   module Loader
     def self.load(root_path)
       root_path_length = root_path.size
