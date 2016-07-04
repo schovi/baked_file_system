@@ -1,4 +1,5 @@
 require "base64"
+require "./baked_file_system/*"
 
 module BakedFileSystem
   class NoSuchFileError < Exception
@@ -56,7 +57,7 @@ module BakedFileSystem
 
     @@files = [] of BakedFileSystem::BakedFile
 
-    source = {{ run("../loader", path, source).stringify }}
+    source = {{ run("./loader", path, source).stringify }}
 
     source.each_line do |line|
       parts = line.split(",")
