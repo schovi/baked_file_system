@@ -11,7 +11,9 @@ module BakedFileSystem
     getter! size : Int32
     getter! encoded : String
 
-    @content : String?
+    @content : Slice(UInt8)?
+    @string  : String?
+    @name    : String?
 
     def initialize(@path, @mime, @size, @encoded)
     end
@@ -21,10 +23,11 @@ module BakedFileSystem
     end
 
     def read
-      @content ||= begin
-        slice = Base64.decode(encoded)
-        String.new(slice)
-      end
+      @string ||= String.new(content)
+    end
+
+    def content
+      @content ||= Base64.decode(encoded)
     end
   end
 
