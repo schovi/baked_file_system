@@ -11,7 +11,7 @@ module BakedFileSystem
     getter! size : Int32
     getter! encoded : String
 
-    @content : Slice(UInt8)?
+    @slice   : Slice(UInt8)?
     @string  : String?
     @name    : String?
 
@@ -23,11 +23,19 @@ module BakedFileSystem
     end
 
     def read
-      @string ||= String.new(content)
+      @string ||= _read
     end
 
-    def content
-      @content ||= Base64.decode(encoded)
+    def to_slice
+      @slice ||= _to_slice
+    end
+
+    private def _read
+      String.new(_to_slice)
+    end
+
+    private def _to_slice
+      Base64.decode(encoded)
     end
   end
 
