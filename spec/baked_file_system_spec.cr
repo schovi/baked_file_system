@@ -30,7 +30,7 @@ describe BakedFileSystem do
   it "get correct content of file" do
     path = "images/pixel.png"
     baked_file = Storage.get(path)
-    original_path = Storage.original_path(path)
+    original_path = File.expand_path(File.join(__DIR__, "storage", path))
 
     baked_file.read.should eq(File.read(original_path))
   end

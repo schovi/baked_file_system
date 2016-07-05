@@ -44,10 +44,6 @@ module BakedFileSystem
     raise NoSuchFileError.new("get: #{path}: No such file or directory")
   end
 
-  def original_path(path)
-    File.expand_path(File.join(@@original_source, @@original_path, path))
-  end
-
   def files
     @@files
   end
@@ -55,8 +51,6 @@ module BakedFileSystem
   macro load(path, source = "")
     extend BakedFileSystem
 
-    @@original_path   = {{path}}
-    @@original_source = {{source}}
 
     @@files = [] of BakedFileSystem::BakedFile
 
