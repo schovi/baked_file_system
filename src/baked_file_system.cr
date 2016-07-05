@@ -6,6 +6,7 @@ module BakedFileSystem
   end
 
   class BakedFile
+    getter! name : String
     getter! path : String
     getter! mime_type : String
     getter! size : Int32
@@ -13,13 +14,9 @@ module BakedFileSystem
 
     @slice   : Slice(UInt8)?
     @string  : String?
-    @name    : String?
 
     def initialize(@path, @mime_type, @size, @encoded)
-    end
-
-    def name
-      @name ||= File.basename(path)
+      @name = File.basename(path)
     end
 
     def read
