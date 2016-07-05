@@ -41,7 +41,7 @@ module BakedFileSystem
 
     return file if file
 
-    raise NoSuchFileError.new("get: #{path}: No such file or directory")
+    raise NoSuchFileError.new("get: #{path}: No such file")
   end
 
   def files
