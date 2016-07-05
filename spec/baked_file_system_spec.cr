@@ -15,6 +15,12 @@ describe BakedFileSystem do
     baked_file.name.should eq("pixel.png")
   end
 
+  it "get correct file mime type" do
+    baked_file = Storage.get("images/pixel.png")
+
+    baked_file.mime_type.should eq("image/png")
+  end
+
   it "throw error for missing file" do
     expect_raises(BakedFileSystem::NoSuchFileError) do
       Storage.get("missing.file")

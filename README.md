@@ -52,7 +52,7 @@ file = FileStorage.get("path/to/file.png")
 file.read    # returns content of file
 file.encoded # returns encoded content, which can be used in base64 urls
 file.name    # returns name of file
-file.mime    # returns mime type
+file.mime_type    # returns mime type
 file.size    # returns size of original file
 ```
 

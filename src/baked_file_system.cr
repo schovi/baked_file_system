@@ -7,7 +7,7 @@ module BakedFileSystem
 
   class BakedFile
     getter! path : String
-    getter! mime : String
+    getter! mime_type : String
     getter! size : Int32
     getter! encoded : String
 
@@ -15,7 +15,7 @@ module BakedFileSystem
     @string  : String?
     @name    : String?
 
-    def initialize(@path, @mime, @size, @encoded)
+    def initialize(@path, @mime_type, @size, @encoded)
     end
 
     def name
