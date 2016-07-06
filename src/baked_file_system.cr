@@ -5,7 +5,7 @@ module BakedFileSystem
   class NoSuchFileError < Exception
   end
 
-  class BakedFile
+  struct BakedFile
     getter! name : String
     getter! path : String
     getter! mime_type : String
