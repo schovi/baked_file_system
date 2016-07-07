@@ -12,19 +12,27 @@ module BakedFileSystem
                   reject { |path| File.directory?(path) || !(path =~ /(\/\..+)/).nil? }
 
       files.each do |path|
-        # encoded_path,encoded_mime_type,size,urlsafe_encoded_content
+        # encoded_path,encoded_mime_type,size,compressed_size,urlsafe_encoded_gzipped_content
         entity = [] of String
 
         # File name
-        entity << Base64.strict_encode(path[root_path_length..-1])
+        entity << path[root_path_length..-1]
         # Mime type
-        entity << Base64.strict_encode(`file -b --mime-type #{path}`.strip)
+        entity << `file -b --mime-type #{path}`.strip
         # Size
         entity << File.stat(path).size.to_s
-        # Content
-        entity << Base64.urlsafe_encode(File.read(path))
+        # gzipped content
+        content = if path.ends_with?("gz")
+          `cat #{path} | base64`
+        else
+          `gzip -c -9 #{path} | base64`
+        end
+        rawcontent = Base64.decode(content)
+        # compressed size
+        entity << rawcontent.size.to_s
+        entity << Base64.urlsafe_encode(rawcontent)
 
-        result << entity.join(",")
+        result << entity.join("|")
       end
 
       result.join("\n")

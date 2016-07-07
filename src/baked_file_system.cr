@@ -1,4 +1,5 @@
 require "base64"
+require "zlib"
 require "./baked_file_system/*"
 
 module BakedFileSystem
@@ -11,28 +12,44 @@ module BakedFileSystem
     getter! mime_type : String
     getter! size : Int32
     getter! encoded : String
+    getter! compressed_size : Int32
 
     @slice   : Slice(UInt8)?
-    @string  : String?
+    @io  : IO?
 
-    def initialize(@path, @mime_type, @size, @encoded)
+    def initialize(@path, @mime_type, @size, @compressed_size, @encoded)
       @name = File.basename(path)
     end
 
-    def read
-      @string ||= _read
+    def write_compressed(io)
+      IO.copy(_to_io, io)
     end
 
-    def to_slice
-      @slice ||= _to_slice
+    def write_uncompressed(io)
+      Zlib::Inflate.gzip(_to_io) do |gz|
+        IO.copy(gz, io)
+      end
+      nil
     end
 
-    private def _read
-      String.new(_to_slice)
+    def uncompressed_slice
+      mem = MemoryIO.new
+      Zlib::Inflate.gzip(_to_io) do |gz|
+        IO.copy(gz, mem)
+      end
+      mem.to_slice
+    end
+
+    def compressed_slice
+      _to_slice
+    end
+
+    private def _to_io
+      @io ||= MemoryIO.new(compressed_slice)
     end
 
     private def _to_slice
-      Base64.decode(encoded)
+      @slice ||= Base64.decode(encoded)
     end
   end
 
@@ -56,19 +73,18 @@ module BakedFileSystem
   macro load(path, source = "")
     extend BakedFileSystem
 
-
     @@files = [] of BakedFileSystem::BakedFile
 
     source = {{ run("./loader", path, source).stringify }}
-
     source.each_line do |line|
-      parts = line.split(",")
+      parts = line.split("|")
 
       @@files << BakedFileSystem::BakedFile.new(
-        Base64.decode_string(parts[0]),
-        Base64.decode_string(parts[1]),
+        parts[0],
+        parts[1],
         parts[2].to_i32,
-        parts[3].strip
+        parts[3].to_i32,
+        parts[4].strip,
       )
     end
   end
