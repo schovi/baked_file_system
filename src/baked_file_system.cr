@@ -14,38 +14,56 @@ module BakedFileSystem
     getter! encoded : String
     getter! compressed_size : Int32
 
-    @slice   : Slice(UInt8)?
-    @io  : IO?
+    @slice : Slice(UInt8)?
+    @io : IO?
 
     def initialize(@path, @mime_type, @size, @compressed_size, @encoded)
       @name = File.basename(path)
     end
 
-    def write_compressed(io)
-      IO.copy(_to_io, io)
+    # Return the data for this file as a String.
+    def read
+      String.new(to_slice(false))
     end
 
-    def write_uncompressed(io)
-      Zlib::Inflate.gzip(_to_io) do |gz|
-        IO.copy(gz, io)
+    # Return the data for this file as a URL-safe Base64-encoded
+    # String.
+    def to_encoded(compressed = true)
+      if compressed
+        encoded
+      else
+        Base64.urlsafe_encode(to_slice(false))
       end
-      nil
     end
 
-    def uncompressed_slice
-      mem = MemoryIO.new
-      Zlib::Inflate.gzip(_to_io) do |gz|
-        IO.copy(gz, mem)
+    # Write the file's data to the given IO, minimizing any
+    # memory copies or unnecessary conversions.
+    def write_to_io(io, compressed = true)
+      if compressed
+        io.write(_to_slice)
+      else
+        Zlib::Inflate.gzip(_to_io) do |gz|
+          IO.copy(gz, io)
+        end
+        nil
       end
-      mem.to_slice
     end
 
-    def compressed_slice
-      _to_slice
+    # Return the file's data as a Slice(UInt8)
+    def to_slice(compressed = true)
+      if compressed
+        _to_slice
+      else
+        mem = MemoryIO.new
+        Zlib::Inflate.gzip(_to_io) do |gz|
+          IO.copy(gz, mem)
+        end
+        mem.to_slice
+      end
     end
 
     private def _to_io
-      @io ||= MemoryIO.new(compressed_slice)
+      @io ||= MemoryIO.new(_to_slice)
     end
 
     private def _to_slice

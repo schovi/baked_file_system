@@ -7,9 +7,9 @@ module BakedFileSystem
 
       result = [] of String
 
-      files = Dir.glob(File.join(root_path, "**", "*")).
-                  # Reject hidden entities and directories
-                  reject { |path| File.directory?(path) || !(path =~ /(\/\..+)/).nil? }
+      files = Dir.glob(File.join(root_path, "**", "*"))
+                 # Reject hidden entities and directories
+                 .reject { |path| File.directory?(path) || !(path =~ /(\/\..+)/).nil? }
 
       files.each do |path|
         # encoded_path,encoded_mime_type,size,compressed_size,urlsafe_encoded_gzipped_content
@@ -23,10 +23,10 @@ module BakedFileSystem
         entity << File.stat(path).size.to_s
         # gzipped content
         content = if path.ends_with?("gz")
-          `cat #{path} | base64`
-        else
-          `gzip -c -9 #{path} | base64`
-        end
+                    `cat #{path} | base64`
+                  else
+                    `gzip -c -9 #{path} | base64`
+                  end
         rawcontent = Base64.decode(content)
         # compressed size
         entity << rawcontent.size.to_s
