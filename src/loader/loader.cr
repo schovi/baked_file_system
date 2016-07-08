@@ -23,9 +23,9 @@ module BakedFileSystem
         entity << File.stat(path).size.to_s
         # gzipped content
         content = if path.ends_with?("gz")
-                    `cat #{path} | base64`
+                    `cat #{path} | #{b64cmd}`
                   else
-                    `gzip -c -9 #{path} | base64`
+                    `gzip -c -9 #{path} | #{b64cmd}`
                   end
         rawcontent = Base64.decode(content)
         # compressed size
@@ -36,6 +36,14 @@ module BakedFileSystem
       end
 
       result.join("\n")
+    end
+
+    def self.b64cmd
+      {% if flag?(:darwin) %}
+        "base64"
+      {% else %}
+        "base64 -w 0"
+      {% end %}
     end
 
     # On OSX, the ancient `file` doesn't handle types like CSS and JS well at all.
