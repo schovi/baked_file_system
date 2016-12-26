@@ -42,11 +42,10 @@ module BakedFileSystem
       if compressed
         io.write(_to_slice)
       else
-        Zlib::Inflate.gzip(_to_io) do |gz|
-          IO.copy(gz, io)
-        end
-        nil
+        _decompress_to_io(io)
       end
+      
+      nil
     end
 
     # Return the file's data as a Slice(UInt8)
@@ -54,20 +53,26 @@ module BakedFileSystem
       if compressed
         _to_slice
       else
-        mem = MemoryIO.new
-        Zlib::Inflate.gzip(_to_io) do |gz|
-          IO.copy(gz, mem)
-        end
-        mem.to_slice
+        io = IO::Memory.new
+        _decompress_to_io(io)
+        io.to_slice
       end
     end
 
     private def _to_io
-      @io ||= MemoryIO.new(_to_slice)
+      @io ||= IO::Memory.new(_to_slice)
     end
 
     private def _to_slice
       @slice ||= Base64.decode(encoded)
+    end
+
+    private def _decompress_to_io(io)
+      Zlib::Inflate.gzip(_to_io) do |gz|
+        IO.copy(gz, io)
+      end
+
+      io
     end
   end
 
@@ -98,11 +103,11 @@ module BakedFileSystem
       parts = line.split("|")
 
       @@files << BakedFileSystem::BakedFile.new(
-        parts[0],
-        parts[1],
-        parts[2].to_i32,
-        parts[3].to_i32,
-        parts[4].strip,
+        path:            parts[0], 
+        mime_type:       parts[1], 
+        size:            parts[2].to_i32, 
+        compressed_size: parts[3].to_i32, 
+        encoded:         parts[4].strip
       )
     end
   end
