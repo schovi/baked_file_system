@@ -2,16 +2,16 @@ require "base64"
 
 module BakedFileSystem
   module Loader
-    def self.load(root_path)
+    def self.load_paths(root_path)
+      get_paths(root_path).join("\n")
+    end
+
+    def self.load_files(root_path)
       root_path_length = root_path.size
 
       result = [] of String
 
-      files = Dir.glob(File.join(root_path, "**", "*"))
-                 # Reject hidden entities and directories
-                 .reject { |path| File.directory?(path) || !(path =~ /(\/\..+)/).nil? }
-
-      files.each do |path|
+      get_paths(root_path).each do |path|
         # encoded_path,encoded_mime_type,size,compressed_size,urlsafe_encoded_gzipped_content
         entity = [] of String
 
@@ -36,6 +36,12 @@ module BakedFileSystem
       end
 
       result.join("\n")
+    end
+
+    def self.get_paths(root_path)
+      Dir.glob(File.join(root_path, "**", "*"))
+        # Reject hidden entities and directories
+        .reject { |path| File.directory?(path) || !(path =~ /(\/\..+)/).nil? }
     end
 
     def self.b64cmd
