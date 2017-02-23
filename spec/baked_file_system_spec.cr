@@ -52,13 +52,13 @@ describe BakedFileSystem do
   end
 
   it "can write directly to an IO" do
-    io = MemoryIO.new
+    io = IO::Memory.new
     file = Storage.get("images/sidekiq.png")
     sz = file.compressed_size
     file.write_to_io(io).should be_nil
     io.size.should eq(sz)
 
-    io = MemoryIO.new
+    io = IO::Memory.new
     file = Storage.get("images/sidekiq.png")
     sz = file.size
     file.write_to_io(io, compressed: false).should be_nil
