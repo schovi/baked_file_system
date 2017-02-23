@@ -1,5 +1,5 @@
 require "base64"
-require "zlib"
+require "gzip"
 require "./baked_file_system/*"
 
 module BakedFileSystem
@@ -68,7 +68,7 @@ module BakedFileSystem
     end
 
     private def _decompress_to_io(io)
-      Zlib::Inflate.gzip(_to_io) do |gz|
+      Gzip::Reader.open(_to_io) do |gz|
         IO.copy(gz, io)
       end
 

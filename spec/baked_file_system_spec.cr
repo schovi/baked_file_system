@@ -13,7 +13,7 @@ describe BakedFileSystem do
     baked_file = Storage.get("images/sidekiq.png")
     baked_file.name.should eq("sidekiq.png")
     baked_file.size.should eq(52949)
-    baked_file.compressed_size.should eq(47862)
+    baked_file.compressed_size.should eq(47883)
     baked_file.mime_type.should eq("image/png")
 
     baked_file = Storage.get("/lorem.txt")
