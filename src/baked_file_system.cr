@@ -94,6 +94,7 @@ module BakedFileSystem
   end
 
   macro load(path, dir = __DIR__)
+    {% raise "BakedFileSystem.load expects `path` to be a StringLiteral." unless path.is_a?(StringLiteral) %}
     extend BakedFileSystem
 
     @@files = [] of BakedFileSystem::BakedFile
