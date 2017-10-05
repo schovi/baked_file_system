@@ -93,6 +93,9 @@ module BakedFileSystem
     @@files
   end
 
+  # Creates a baked file system and loads contents of files in *path*.
+  # If *path* is relative, it will be based on *dir* which defaults to `__DIR__`.
+  # It will raise if there are no files found in *path* unless *allow_empty* is set to `true`.
   macro load(path, dir = __DIR__, allow_empty = false)
     {% raise "BakedFileSystem.load expects `path` to be a StringLiteral." unless path.is_a?(StringLiteral) %}
     extend BakedFileSystem
