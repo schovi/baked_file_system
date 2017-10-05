@@ -64,6 +64,15 @@ describe BakedFileSystem do
     file.write_to_io(io, compressed: false).should be_nil
     io.size.should eq(sz)
   end
+
+  it "raises if path does not contain entries" do
+    expect_raises Exception, "BakedFileSystem empty" do
+      Storage.register_files_from_loader("\n", "storage/empty", false)
+    end
+  end
+  it "allows empty if path does not contain entries" do
+    Storage.register_files_from_loader("\n", "storage/empty", true)
+  end
 end
 
 def read_slice(path)

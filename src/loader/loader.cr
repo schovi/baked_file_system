@@ -22,10 +22,6 @@ module BakedFileSystem
                  # Reject hidden entities and directories
                  .reject { |path| File.directory?(path) || !(path =~ /(\/\..+)/).nil? }
 
-      if files.empty?
-        raise Error.new "no files found: #{root_path}"
-      end
-
       files.each do |path|
         # encoded_path,encoded_mime_type,size,compressed_size,urlsafe_encoded_gzipped_content
         entity = [] of String
