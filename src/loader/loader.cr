@@ -2,7 +2,18 @@ require "base64"
 
 module BakedFileSystem
   module Loader
+    class Error < Exception
+    end
+
     def self.load(root_path)
+      if !File.exists?(root_path)
+        raise Error.new "path does not exist: #{root_path}"
+      elsif !File.directory?(root_path)
+        raise Error.new "path is not a directory: #{root_path}"
+      elsif !File.readable?(root_path)
+        raise Error.new "path is not readable: #{root_path}"
+      end
+
       root_path_length = root_path.size
 
       result = [] of String
@@ -10,6 +21,10 @@ module BakedFileSystem
       files = Dir.glob(File.join(root_path, "**", "*"))
                  # Reject hidden entities and directories
                  .reject { |path| File.directory?(path) || !(path =~ /(\/\..+)/).nil? }
+
+      if files.empty?
+        raise Error.new "no files found: #{root_path}"
+      end
 
       files.each do |path|
         # encoded_path,encoded_mime_type,size,compressed_size,urlsafe_encoded_gzipped_content
