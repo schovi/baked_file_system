@@ -93,23 +93,31 @@ module BakedFileSystem
     @@files
   end
 
-  macro load(path, dir = __DIR__)
+  macro load(path, dir = __DIR__, allow_empty = false)
     {% raise "BakedFileSystem.load expects `path` to be a StringLiteral." unless path.is_a?(StringLiteral) %}
     extend BakedFileSystem
 
     @@files = [] of BakedFileSystem::BakedFile
 
-    source = {{ run("./loader", path, dir).stringify }}
-    source.each_line do |line|
-      parts = line.split("|")
+    register_files_from_loader {{ run("./loader", path, dir).stringify }}, File.expand_path({{ path }}, {{ dir }}), {{ allow_empty }}
+  end
 
-      @@files << BakedFileSystem::BakedFile.new(
-        path:            parts[0],
-        mime_type:       parts[1],
-        size:            parts[2].to_i32,
-        compressed_size: parts[3].to_i32,
-        encoded:         parts[4].strip
-      )
+  # :nodoc:
+  def register_files_from_loader(source, path, allow_empty)
+    if source.size > 1
+      source.each_line do |line|
+        parts = line.split("|")
+
+        @@files << BakedFileSystem::BakedFile.new(
+          path:            parts[0],
+          mime_type:       parts[1],
+          size:            parts[2].to_i32,
+          compressed_size: parts[3].to_i32,
+          encoded:         parts[4].strip
+        )
+      end
+    elsif !allow_empty
+      raise "BakedFileSystem empty: no files in #{path}"
     end
   end
 end
