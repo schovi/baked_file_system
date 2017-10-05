@@ -33,15 +33,12 @@ class FileStorage
 end
 ```
 
-Better and more often usage will be this, where you need to locate files in your repository
+Better and more often usage will be, when you need to locate files in your repository
 That repository can be in different locations (imagine more ppl working on same program)
-Use relative path and pass second argument `__DIR__`
-
-This weird API is because how crystal macros and variable/constants resolving in them works. You cant pass any expression in them
 
 ```crystal
 class FileStorage
-  BakedFileSystem.load("../public", __DIR__)
+  BakedFileSystem.load("../public")
 end
 
 ```
