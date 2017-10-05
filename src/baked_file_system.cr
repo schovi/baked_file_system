@@ -44,7 +44,7 @@ module BakedFileSystem
       else
         _decompress_to_io(io)
       end
-      
+
       nil
     end
 
@@ -103,10 +103,10 @@ module BakedFileSystem
       parts = line.split("|")
 
       @@files << BakedFileSystem::BakedFile.new(
-        path:            parts[0], 
-        mime_type:       parts[1], 
-        size:            parts[2].to_i32, 
-        compressed_size: parts[3].to_i32, 
+        path:            parts[0],
+        mime_type:       parts[1],
+        size:            parts[2].to_i32,
+        compressed_size: parts[3].to_i32,
         encoded:         parts[4].strip
       )
     end
