@@ -1,7 +1,7 @@
 require "./spec_helper"
 
 class Storage
-  BakedFileSystem.load("./storage", __DIR__)
+  BakedFileSystem.load("./storage")
 end
 
 describe BakedFileSystem do

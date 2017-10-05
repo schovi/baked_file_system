@@ -1,9 +1,4 @@
 require "./loader/*"
 
-path = ARGV[0]
-
-if ARGV[1]?
-  path = File.expand_path(File.join(ARGV[1], path))
-end
-
+path = File.expand_path(ARGV[0], ARGV[1])
 puts BakedFileSystem::Loader.load(path)

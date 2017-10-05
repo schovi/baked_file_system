@@ -93,12 +93,12 @@ module BakedFileSystem
     @@files
   end
 
-  macro load(path, source = "")
+  macro load(path, dir = __DIR__)
     extend BakedFileSystem
 
     @@files = [] of BakedFileSystem::BakedFile
 
-    source = {{ run("./loader", path, source).stringify }}
+    source = {{ run("./loader", path, dir).stringify }}
     source.each_line do |line|
       parts = line.split("|")
 
