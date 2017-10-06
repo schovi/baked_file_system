@@ -1,4 +1,5 @@
 require "base64"
+require "gzip"
 
 module BakedFileSystem
   module Loader
@@ -23,33 +24,58 @@ module BakedFileSystem
                  .reject { |path| File.directory?(path) || !(path =~ /(\/\..+)/).nil? }
 
       files.each do |path|
-        # encoded_path,encoded_mime_type,size,compressed_size,urlsafe_encoded_gzipped_content
-        entity = [] of String
-
-        content = if path.ends_with?("gz")
-          `cat #{path} | #{b64cmd}`
-        else
-          `gzip -c -9 #{path} | #{b64cmd}`
-        end
-        rawcontent = Base64.decode(content)
-
         io << "@@files << BakedFileSystem::BakedFile.new(\n"
         io << "  path:            " << path[root_path_length..-1].dump << ",\n"
         io << "  mime_type:       " << (mime_type(path) || `file -b --mime-type #{path}`.strip).dump << ",\n"
         io << "  size:            " << File.stat(path).size << ",\n"
-        io << "  compressed_size: " << rawcontent.size << ",\n"
-        io << "  encoded:         " << Base64.urlsafe_encode(rawcontent).dump << ",\n"
+
+        File.open(path, "r") do |file|
+          io << "  encoded:         \""
+
+          Encoder.open(io) do |encoder|
+            if path.ends_with?("gz")
+              IO.copy file, encoder
+            else
+              Gzip::Writer.open(encoder) do |writer|
+                IO.copy file, writer
+              end
+            end
+
+            io << "\",\n"
+
+          end
+        end
+
         io << ")\n"
         io << "\n"
       end
     end
 
-    def self.b64cmd
-      {% if flag?(:darwin) %}
-        "base64"
-      {% else %}
-        "base64 -w 0"
-      {% end %}
+    class Encoder < IO
+      def initialize(@io : IO)
+      end
+
+      def self.open(io : IO)
+        encoder = new(io)
+        yield encoder ensure encoder.close
+      end
+
+      def read(slice : Bytes)
+        raise "Can't read from Encoder"
+      end
+
+      def write(slice : Bytes)
+        slice.each do |byte|
+          case byte
+          when 35_u8..91_u8, 93_u8..127_u8
+            @io << byte.chr
+          else
+            @io << "\\x"
+            @io << '0' if byte < 16_u8
+            @io << byte.to_s(16)
+          end
+        end
+      end
     end
 
     # On OSX, the ancient `file` doesn't handle types like CSS and JS well at all.
