@@ -5,7 +5,7 @@ module BakedFileSystem
     class Error < Exception
     end
 
-    def self.load(root_path)
+    def self.load(io, root_path)
       if !File.exists?(root_path)
         raise Error.new "path does not exist: #{root_path}"
       elsif !File.directory?(root_path)
@@ -26,27 +26,22 @@ module BakedFileSystem
         # encoded_path,encoded_mime_type,size,compressed_size,urlsafe_encoded_gzipped_content
         entity = [] of String
 
-        # File name
-        entity << path[root_path_length..-1]
-        # Mime type
-        entity << (mime_type(path) || `file -b --mime-type #{path}`.strip)
-        # Size
-        entity << File.stat(path).size.to_s
-        # gzipped content
         content = if path.ends_with?("gz")
-                    `cat #{path} | #{b64cmd}`
-                  else
-                    `gzip -c -9 #{path} | #{b64cmd}`
-                  end
+          `cat #{path} | #{b64cmd}`
+        else
+          `gzip -c -9 #{path} | #{b64cmd}`
+        end
         rawcontent = Base64.decode(content)
-        # compressed size
-        entity << rawcontent.size.to_s
-        entity << Base64.urlsafe_encode(rawcontent)
 
-        result << entity.join("|")
+        io << "@@files << BakedFileSystem::BakedFile.new(\n"
+        io << "  path:            " << path[root_path_length..-1].dump << ",\n"
+        io << "  mime_type:       " << (mime_type(path) || `file -b --mime-type #{path}`.strip).dump << ",\n"
+        io << "  size:            " << File.stat(path).size << ",\n"
+        io << "  compressed_size: " << rawcontent.size << ",\n"
+        io << "  encoded:         " << Base64.urlsafe_encode(rawcontent).dump << ",\n"
+        io << ")\n"
+        io << "\n"
       end
-
-      result.join("\n")
     end
 
     def self.b64cmd

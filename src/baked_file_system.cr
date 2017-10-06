@@ -102,25 +102,10 @@ module BakedFileSystem
 
     @@files = [] of BakedFileSystem::BakedFile
 
-    register_files_from_loader {{ run("./loader", path, dir).stringify }}, File.expand_path({{ path }}, {{ dir }}), {{ allow_empty }}
-  end
+    {{ run("./loader", path, dir) }}
 
-  # :nodoc:
-  def register_files_from_loader(source, path, allow_empty)
-    if source.size > 1
-      source.each_line do |line|
-        parts = line.split("|")
-
-        @@files << BakedFileSystem::BakedFile.new(
-          path:            parts[0],
-          mime_type:       parts[1],
-          size:            parts[2].to_i32,
-          compressed_size: parts[3].to_i32,
-          encoded:         parts[4].strip
-        )
-      end
-    elsif !allow_empty
-      raise "BakedFileSystem empty: no files in #{path}"
-    end
+    {% unless allow_empty %}
+    raise "BakedFileSystem empty: no files in #{File.expand_path({{ path }}, {{ dir }})}" if @@files.size == 0
+    {% end %}
   end
 end
