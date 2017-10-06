@@ -28,12 +28,15 @@ module BakedFileSystem
         io << "  path:            " << path[root_path_length..-1].dump << ",\n"
         io << "  mime_type:       " << (mime_type(path) || `file -b --mime-type #{path}`.strip).dump << ",\n"
         io << "  size:            " << File.stat(path).size << ",\n"
+        compressed = path.ends_with?("gz")
 
-        File.open(path, "r") do |file|
-          io << "  encoded:         \""
+        io << "  compressed:      " << compressed << ",\n"
+
+        File.open(path, "rb") do |file|
+          io << "  slice:         \""
 
           Encoder.open(io) do |encoder|
-            if path.ends_with?("gz")
+            if compressed
               IO.copy file, encoder
             else
               Gzip::Writer.open(encoder) do |writer|
@@ -41,8 +44,7 @@ module BakedFileSystem
               end
             end
 
-            io << "\",\n"
-
+            io << "\".to_slice,\n"
           end
         end
 

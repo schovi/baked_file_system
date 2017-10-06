@@ -6,74 +6,90 @@ module BakedFileSystem
   class NoSuchFileError < Exception
   end
 
-  struct BakedFile
-    getter name : String
+  class BakedFile < IO
     getter path : String
     getter mime_type : String
     getter size : Int32
-    getter encoded : String
+    getter slice : Bytes
     getter compressed_size : Int32
 
-    @slice : Slice(UInt8)?
-    @io : IO?
+    # Whether this file compressed. If not, it is decompressed on read.
+    getter? compressed : Bool
 
-    def initialize(@path, @mime_type, @size, @encoded)
-      @compressed_size = @encoded.bytesize
-      @name = File.basename(path)
+    def initialize(@path, @mime_type, @size, @compressed, @slice)
+      @compressed_size = @slice.bytesize
+
+      @memory_io = IO::Memory.new(@slice)
+      @wrapped_io = compressed? ? @memory_io : Gzip::Reader.new(@memory_io)
+    end
+
+    def name
+      File.basename(path)
+    end
+
+    def read(slice : Bytes)
+      @wrapped_io.read(slice)
+    end
+
+    def write(slice : Bytes)
+      raise "Can't write to BakedFileSystem::BakedFile"
+    end
+
+    def rewind
+      @memory_io.rewind
+      @wrapped_io = compressed? ? @memory_io : Gzip::Reader.new(@memory_io)
+    end
+
+    def to_slice
+      @slice.dup
     end
 
     # Return the data for this file as a String.
+    #
+    # DEPRECATED: `BakedFile` can be used as an IO directly. Use `gets_to_end` instead
     def read
-      String.new(to_slice(false))
+      gets_to_end
     end
 
     # Return the data for this file as a URL-safe Base64-encoded
     # String.
+    #
+    # DEPRECATED: `BakedFile` can be used as an IO directly.
     def to_encoded(compressed = true)
       if compressed
-        encoded
+        raw = @slice
       else
-        Base64.urlsafe_encode(to_slice(false))
+        raw = read
+        rewind
       end
+      Base64.urlsafe_encode raw
     end
 
     # Write the file's data to the given IO, minimizing any
     # memory copies or unnecessary conversions.
+    #
+    # DEPRECATED: `BakedFile` can be used as an IO directly.
     def write_to_io(io, compressed = true)
       if compressed
-        io.write(_to_slice)
+        io.write(@slice)
       else
-        _decompress_to_io(io)
+        IO.copy(self, io)
       end
 
       nil
     end
 
     # Return the file's data as a Slice(UInt8)
-    def to_slice(compressed = true)
+    #
+    # DEPRECATED: `BakedFile` can be used as an IO directly.
+    def to_slice(compressed)
       if compressed
-        _to_slice
+        to_slice
       else
-        io = IO::Memory.new
-        _decompress_to_io(io)
-        io.to_slice
+        Bytes.new(size).tap do |slice|
+          read(slice)
+        end
       end
-    end
-
-    private def _to_io
-      @io ||= IO::Memory.new(_to_slice)
-    end
-
-    private def _to_slice
-      @slice ||= encoded.to_slice
-    end
-
-    private def _decompress_to_io(io)
-      Gzip::Reader.open(_to_io) do |gz|
-        IO.copy(gz, io)
-      end
-
-      io
     end
   end
 
@@ -85,9 +101,10 @@ module BakedFileSystem
       file.path == path
     end
 
-    return file if file
+    raise NoSuchFileError.new("get: #{path}: No such file") unless file
 
-    raise NoSuchFileError.new("get: #{path}: No such file")
+    file.rewind
+    file
   end
 
   def files
