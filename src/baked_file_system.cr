@@ -7,17 +7,18 @@ module BakedFileSystem
   end
 
   struct BakedFile
-    getter! name : String
-    getter! path : String
-    getter! mime_type : String
-    getter! size : Int32
-    getter! encoded : String
-    getter! compressed_size : Int32
+    getter name : String
+    getter path : String
+    getter mime_type : String
+    getter size : Int32
+    getter encoded : String
+    getter compressed_size : Int32
 
     @slice : Slice(UInt8)?
     @io : IO?
 
-    def initialize(@path, @mime_type, @size, @compressed_size, @encoded)
+    def initialize(@path, @mime_type, @size, @encoded)
+      @compressed_size = @encoded.bytesize
       @name = File.basename(path)
     end
 
@@ -64,7 +65,7 @@ module BakedFileSystem
     end
 
     private def _to_slice
-      @slice ||= Base64.decode(encoded)
+      @slice ||= encoded.to_slice
     end
 
     private def _decompress_to_io(io)
