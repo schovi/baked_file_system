@@ -6,7 +6,7 @@ end
 
 describe BakedFileSystem do
   it "load only files without hidden one" do
-    Storage.files.size.should eq(2)
+    Storage.files.size.should eq(3)
   end
 
   it "get correct file attributes" do

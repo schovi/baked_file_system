@@ -69,8 +69,10 @@ module BakedFileSystem
       def write(slice : Bytes)
         slice.each do |byte|
           case byte
-          when 35_u8..91_u8, 93_u8..127_u8
+          when 36_u8..91_u8, 93_u8..127_u8
             @io << byte.chr
+          when 35_u8
+            @io << "\\#"
           else
             @io << "\\x"
             @io << '0' if byte < 16_u8
