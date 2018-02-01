@@ -1,5 +1,6 @@
 require "base64"
 require "gzip"
+require "./string_encoder"
 
 module BakedFileSystem
   module Loader
@@ -35,7 +36,7 @@ module BakedFileSystem
         File.open(path, "rb") do |file|
           io << "  slice:         \""
 
-          Encoder.open(io) do |encoder|
+          StringEncoder.open(io) do |encoder|
             if compressed
               IO.copy file, encoder
             else
@@ -50,33 +51,6 @@ module BakedFileSystem
 
         io << ")\n"
         io << "\n"
-      end
-    end
-
-    class Encoder < IO
-      def initialize(@io : IO)
-      end
-
-      def self.open(io : IO)
-        encoder = new(io)
-        yield encoder ensure encoder.close
-      end
-
-      def read(slice : Bytes)
-        raise "Can't read from Encoder"
-      end
-
-      def write(slice : Bytes)
-        slice.each do |byte|
-          case byte
-          when 35_u8..91_u8, 93_u8..127_u8
-            @io << byte.chr
-          else
-            @io << "\\x"
-            @io << '0' if byte < 16_u8
-            @io << byte.to_s(16)
-          end
-        end
       end
     end
 
