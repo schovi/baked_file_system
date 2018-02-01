@@ -4,9 +4,17 @@ class Storage
   BakedFileSystem.load("./storage")
 end
 
+def read_slice(path)
+  File.open(path, "rb") do |io|
+    Slice(UInt8).new(io.size).tap do |buf|
+      io.read_fully(buf)
+    end
+  end
+end
+
 describe BakedFileSystem do
   it "load only files without hidden one" do
-    Storage.files.size.should eq(2)
+    Storage.files.size.should eq(4)
   end
 
   it "get correct file attributes" do
@@ -64,12 +72,8 @@ describe BakedFileSystem do
     file.write_to_io(io, compressed: false).should be_nil
     io.size.should eq(sz)
   end
-end
 
-def read_slice(path)
-  File.open(path, "rb") do |io|
-    Slice(UInt8).new(io.size).tap do |buf|
-      io.read_fully(buf)
-    end
+  it "handles interpolation in content" do
+    String.new(Storage.get("string_encoding/interpolation.gz").slice).should eq "\#{foo} \{% macro %}\n"
   end
 end
