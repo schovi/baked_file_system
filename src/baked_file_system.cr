@@ -2,18 +2,55 @@ require "base64"
 require "gzip"
 require "./baked_file_system/*"
 
+# A `BakedFileSystem` allows to include ("bake") static files into a compiled
+# binary and make them accessible at runtime using their path.
+#
+# ## Usage
+# ```crystal
+# # Using BakedFileSystem.load
+# class MyFileSystem
+#   BakedFileSystem.load("path/to/root/folder")
+# end
+#
+# # Creating a file manually
+# class MyFileSystem
+#   extend BakedFileSystem
+#   @@files = [
+#     BakedFileSystem::BakedFile.new("hello-world.txt", "text/plain", 12, false, "Hello World\n".to_slice),
+#   ]
+# end
+# ```
 module BakedFileSystem
+  # This error is raised when trying to access a non-existing file on a
+  # `BakedFileSystem`.
   class NoSuchFileError < Exception
   end
 
+  # `BakedFile` represents a virtual file in a `BakedFileSystem`.
+  #
+  # # Usage
+  #
+  # ```crystal
+  # file = MyFileSystem.get("hello-world.txt")
+  # file.path        # => "hello-world.txt"
+  # file.size        # => 12
+  # file.gets        # => "Hello World\n"
+  # file.compressed? # => false
+  # ```
   class BakedFile < IO
+    # Returns the path in the virtual file system.
     getter path : String
+
     getter mime_type : String
+
+    # Returns the size of this virtual file.
     getter size : Int32
     getter slice : Bytes
+
+    # Returns the compressed size of this virtual file.
     getter compressed_size : Int32
 
-    # Whether this file compressed. If not, it is decompressed on read.
+    # Returns whether this file is compressed. If not, it is decompressed on read.
     getter? compressed : Bool
 
     def initialize(@path, @mime_type, @size, @compressed, @slice)
@@ -40,8 +77,10 @@ module BakedFileSystem
       @wrapped_io = compressed? ? @memory_io : Gzip::Reader.new(@memory_io)
     end
 
-    def to_slice
-      @slice.dup
+    # Returns a `Bytes` holding the (compressed) content of this virtual file.
+    # This data needs to be extracted using a `Gzip::Reader` unless `#compressed?` is true.
+    def to_slice : Bytes
+      @slice
     end
 
     # Return the data for this file as a String.
@@ -93,7 +132,15 @@ module BakedFileSystem
     end
   end
 
-  def get(path)
+  # Returns a `BakedFile` at *path*.
+  #
+  # Raises `NoSuchFileError` if the virtual file does not exist.
+  def get(path : String) : BakedFile
+    get?(path) || raise NoSuchFileError.new("get: #{path}: No such file")
+  end
+
+  # Returns a `BakedFile` at *path* or `nil` if the virtual file does not exist.
+  def get?(path : String) : BakedFile?
     path = path.strip
     path = "/" + path unless path.starts_with?("/")
 
@@ -101,13 +148,14 @@ module BakedFileSystem
       file.path == path
     end
 
-    raise NoSuchFileError.new("get: #{path}: No such file") unless file
+    return nil unless file
 
     file.rewind
     file
   end
 
-  def files
+  # Returns all virtual files in this file system.
+  def files : Array(BakedFile)
     @@files
   end
 

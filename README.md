@@ -48,23 +48,23 @@ And finally how to get files from that storage
 ```crystal
 file = FileStorage.get("path/to/file.png")
 
-file.read    # returns content of file
-file.encoded # returns encoded content, which can be used in base64 urls
-file.name    # returns name of file
+file.gets    # returns content of file
+file.path    # returns path of file
 file.mime_type    # returns mime type
 file.size    # returns size of original file
 ```
 
-When try to get missing file, BakedFileSystem thows BakedFileSystem::NoSuchFileError exception
+When try to get missing file, `BakedFileSystem.get` raises a `BakedFileSystem::NoSuchFileError` exception
+while `BakedFileSystem.get?` returns `nil`.
 
 ```crystal
-path = "missing/file"
-
 begin
-  FileStorage.get(path)
+  FileStorage.get "missing/file"
 rescue BakedFileSystem::NoSuchFileError
   puts "File #{path} is missing"
 end
+
+FileStorage.get? "missing/file" # => nil
 ```
 
 ## Development
