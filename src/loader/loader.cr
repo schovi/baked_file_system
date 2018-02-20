@@ -27,7 +27,6 @@ module BakedFileSystem
       files.each do |path|
         io << "bake_file BakedFileSystem::BakedFile.new(\n"
         io << "  path:            " << path[root_path_length..-1].dump << ",\n"
-        io << "  mime_type:       " << (mime_type(path) || `file -b --mime-type #{path}`.strip).dump << ",\n"
         io << "  size:            " << File.info(path).size << ",\n"
         compressed = path.ends_with?("gz")
 
@@ -51,17 +50,6 @@ module BakedFileSystem
 
         io << ")\n"
         io << "\n"
-      end
-    end
-
-    # On OSX, the ancient `file` doesn't handle types like CSS and JS well at all.
-    def self.mime_type(path)
-      case File.extname(path)
-      when ".txt"          then "text/plain"
-      when ".htm", ".html" then "text/html"
-      when ".css"          then "text/css"
-      when ".js"           then "application/javascript"
-      else                      nil
       end
     end
   end
