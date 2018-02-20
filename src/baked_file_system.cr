@@ -54,10 +54,6 @@ module BakedFileSystem
       @wrapped_io = compressed? ? @memory_io : Gzip::Reader.new(@memory_io)
     end
 
-    def name
-      File.basename(path)
-    end
-
     def read(slice : Bytes)
       @wrapped_io.read(slice)
     end
