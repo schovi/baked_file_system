@@ -45,12 +45,11 @@ module BakedFileSystem
 
     # Returns the size of this virtual file.
     getter size : Int32
-    getter slice : Bytes
 
     # Returns whether this file is compressed. If not, it is decompressed on read.
     getter? compressed : Bool
 
-    def initialize(@path, @mime_type, @size, @compressed, @slice)
+    def initialize(@path, @mime_type, @size, @compressed, @slice : Bytes)
       @memory_io = IO::Memory.new(@slice)
       @wrapped_io = compressed? ? @memory_io : Gzip::Reader.new(@memory_io)
     end
