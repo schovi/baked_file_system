@@ -171,4 +171,8 @@ module BakedFileSystem
     raise "BakedFileSystem empty: no files in #{File.expand_path({{ path }}, {{ dir }})}" if @@files.size == 0
     {% end %}
   end
+
+  def bake_file(file : BakedFile)
+    @@files << file
+  end
 end
