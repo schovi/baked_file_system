@@ -1,7 +1,24 @@
 require "./spec_helper"
 
 class Storage
-  BakedFileSystem.load("./storage")
+  extend BakedFileSystem
+  bake_folder "./storage"
+end
+
+class ManualStorage
+  extend BakedFileSystem
+  bake_file "hello-world.txt", "Hello World\n"
+end
+
+class MutlipleStorage
+  extend BakedFileSystem
+  bake_folder "./storage"
+
+  it "raises for empty folder" do
+    expect_raises(Exception, "no files in") do
+      bake_folder "./empty_storage"
+    end
+  end
 end
 
 def read_slice(path)
@@ -33,6 +50,7 @@ describe BakedFileSystem do
     expect_raises(BakedFileSystem::NoSuchFileError) do
       Storage.get("missing.file")
     end
+    Storage.get?("missing.file").should be_nil
   end
 
   it "can read file contents" do
@@ -73,5 +91,13 @@ describe BakedFileSystem do
 
   it "handles interpolation in content" do
     String.new(Storage.get("string_encoding/interpolation.gz").to_slice).should eq "\#{foo} \{% macro %}\n"
+  end
+
+  describe ManualStorage do
+    it do
+      file = ManualStorage.get("hello-world.txt")
+      file.size.should eq 12
+      file.gets_to_end.should eq "Hello World\n"
+    end
   end
 end

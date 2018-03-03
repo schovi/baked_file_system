@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/schovi/baked_file_system.svg?branch=master)](https://travis-ci.org/schovi/baked_file_system)
 
-Include (bake them) static files into your binary and access them anytime you need.
+Include (bake them) static files into a binary at compile time and access them anytime you need.
 
 ## Installation
 
@@ -15,47 +15,37 @@ dependencies:
     github: schovi/baked_file_system
 ```
 
-
 ## Usage
 
-Load library with:
+A custom type that extends `BakedFileSystem` is used as a file system. The macro `bake_folder` bakes all files in
+a given path into the virtual file system. Both relative and absolute paths are supported, as well as baking multiple
+folders.
 
 ```crystal
 require "baked_file_system"
 
-```
-
-Load folder with absolute path
-
-```crystal
 class FileStorage
-  BakedFileSystem.load("/home/my_name/work/crystal_project/public")
-end
-```
+  extend BakedFileSystem
 
-Better and more often usage will be, when you need to locate files in your repository
-That repository can be in different locations (imagine more ppl working on same program)
-
-```crystal
-class FileStorage
-  BakedFileSystem.load("../public")
+  bake_folder "/home/my_name/work/crystal_project/public"
+  bake_folder "../public"
 end
 
 ```
 
-And finally how to get files from that storage
+Files can be loaded using `get` and `get?` class methods.
 
 ```crystal
 file = FileStorage.get("path/to/file.png")
 
-file.gets    # returns content of file
-file.path    # returns path of file
+file.gets_to_end  # returns content of file
+file.path         # returns path of file
 file.mime_type    # returns mime type
-file.size    # returns size of original file
+file.size         # returns size of original file
 ```
 
-When try to get missing file, `BakedFileSystem.get` raises a `BakedFileSystem::NoSuchFileError` exception
-while `BakedFileSystem.get?` returns `nil`.
+When try to get missing file, `get` raises a `BakedFileSystem::NoSuchFileError` exception
+while `get?` returns `nil`.
 
 ```crystal
 begin

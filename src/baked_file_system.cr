@@ -9,15 +9,14 @@ require "./baked_file_system/*"
 # ```crystal
 # # Using BakedFileSystem.load
 # class MyFileSystem
-#   BakedFileSystem.load("path/to/root/folder")
+#   extend BakedFileSystem
+#   bake_folder "path/to/root/folder"
 # end
 #
 # # Creating a file manually
 # class MyFileSystem
 #   extend BakedFileSystem
-#   @@files = [
-#     BakedFileSystem::BakedFile.new("hello-world.txt", "text/plain", 12, false, "Hello World\n".to_slice),
-#   ]
+#   bake_file "hello-world.txt", "Hello World\n"
 # end
 # ```
 module BakedFileSystem
@@ -34,7 +33,7 @@ module BakedFileSystem
   # file = MyFileSystem.get("hello-world.txt")
   # file.path        # => "hello-world.txt"
   # file.size        # => 12
-  # file.gets        # => "Hello World\n"
+  # file.gets_to_end # => "Hello World\n"
   # file.compressed? # => false
   # ```
   class BakedFile < IO
@@ -50,6 +49,7 @@ module BakedFileSystem
     getter? compressed : Bool
 
     def initialize(@path, @mime_type, @size, @compressed, @slice : Bytes)
+      @path = "/" + @path unless @path.starts_with? '/'
       @memory_io = IO::Memory.new(@slice)
       @wrapped_io = compressed? ? @memory_io : Gzip::Reader.new(@memory_io)
     end
@@ -152,27 +152,50 @@ module BakedFileSystem
   end
 
   # Returns all virtual files in this file system.
-  def files : Array(BakedFile)
+  def files : Array(BakedFileSystem::BakedFile)
     @@files
+  end
+
+  macro extended
+    @@files = [] of BakedFileSystem::BakedFile
+
+    macro bake_folder(path, dir = __DIR__, allow_empty = false)
+      BakedFileSystem.bake_folder(\{{ path }}, \{{ dir }}, \{{ allow_empty }})
+    end
   end
 
   # Creates a baked file system and loads contents of files in *path*.
   # If *path* is relative, it will be based on *dir* which defaults to `__DIR__`.
   # It will raise if there are no files found in *path* unless *allow_empty* is set to `true`.
+  #
+  # DEPRECATED: Use `extend BakedFileSystem` and `bake_folder` instead.
   macro load(path, dir = __DIR__, allow_empty = false)
-    {% raise "BakedFileSystem.load expects `path` to be a StringLiteral." unless path.is_a?(StringLiteral) %}
     extend BakedFileSystem
+    bake_folder {{ path }}, {{ dir }}, {{ allow_empty }}
+  end
 
-    @@files = [] of BakedFileSystem::BakedFile
+  # Bakes all files in *path* into this baked file system.
+  # If *path* is relative, it will be based on *dir* which defaults to `__DIR__`.
+  # It will raise if there are no files found in *path* unless *allow_empty* is set to `true`.
+  macro bake_folder(path, dir = __DIR__, allow_empty = false)
+    {% raise "BakedFileSystem.load expects `path` to be a StringLiteral." unless path.is_a?(StringLiteral) %}
+
+    %files_size_ante = @@files.size
 
     {{ run("./loader", path, dir) }}
 
     {% unless allow_empty %}
-    raise "BakedFileSystem empty: no files in #{File.expand_path({{ path }}, {{ dir }})}" if @@files.size == 0
+    raise "BakedFileSystem empty: no files in #{File.expand_path({{ path }}, {{ dir }})}" if @@files.size - %files_size_ante == 0
     {% end %}
   end
 
+  # Adds a baked *file* to this file system.
   def bake_file(file : BakedFile)
     @@files << file
+  end
+
+  # Creates a `BakedFile` at *path* with content *content* and adds it to this file system.
+  def bake_file(path : String, content)
+    bake_file BakedFileSystem::BakedFile.new(path, "no/mime", content.size, true, content.to_slice)
   end
 end
