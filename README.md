@@ -13,6 +13,7 @@ Add this to your application's `shard.yml`:
 dependencies:
   baked_file_system:
     github: schovi/baked_file_system
+    version: 0.9.8
 ```
 
 ## Usage
