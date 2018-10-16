@@ -93,6 +93,15 @@ describe BakedFileSystem do
     String.new(Storage.get("string_encoding/interpolation.gz").to_slice).should eq "\#{foo} \{% macro %}\n"
   end
 
+  it "allows access to raw compressed data" do
+    io = IO::Memory.new
+    file = Storage.get("images/sidekiq.png").raw
+    size = file.compressed_size
+    IO.copy(file, io)
+    io.size.should eq(size)
+    file.size.should eq(size)
+  end
+
   describe ManualStorage do
     it do
       file = ManualStorage.get("hello-world.txt")

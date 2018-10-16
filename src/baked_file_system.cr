@@ -127,6 +127,12 @@ module BakedFileSystem
         end
       end
     end
+
+    # Return a new virtual file using the same slice but allowing to
+    # access the compressed data directly
+    def raw
+      self.class.new(@path, @mime_type, @slice.bytesize, true, @slice)
+    end
   end
 
   # Returns a `BakedFile` at *path*.
