@@ -41,7 +41,6 @@ file = FileStorage.get("path/to/file.png")
 
 file.gets_to_end  # returns content of file
 file.path         # returns path of file
-file.mime_type    # returns mime type
 file.size         # returns size of original file
 ```
 
