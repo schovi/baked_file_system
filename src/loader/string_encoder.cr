@@ -39,5 +39,7 @@ class BakedFileSystem::StringEncoder < IO
         byte.to_s(16, @io, upcase: true)
       end
     end
+
+    slice.size.to_i64
   end
 end
