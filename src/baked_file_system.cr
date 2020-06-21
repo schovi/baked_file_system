@@ -63,7 +63,7 @@ module BakedFileSystem
       @slice.bytesize
     end
 
-    def write(slice : Bytes) : Int64
+    def write(slice : Bytes)
       raise "Can't write to BakedFileSystem::BakedFile"
     end
 
