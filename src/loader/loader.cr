@@ -1,5 +1,5 @@
 require "base64"
-require "gzip"
+require "compress/gzip"
 require "./string_encoder"
 
 module BakedFileSystem
@@ -39,7 +39,7 @@ module BakedFileSystem
             if compressed
               IO.copy file, encoder
             else
-              Gzip::Writer.open(encoder) do |writer|
+              Compress::Gzip::Writer.open(encoder) do |writer|
                 IO.copy file, writer
               end
             end
