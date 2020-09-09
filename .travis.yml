@@ -1,1 +1,16 @@
 language: crystal
+
+crystal:
+  - latest
+  - nightly
+
+jobs:
+  allow_failures:
+    - crystal: nightly
+
+install:
+  - shards install
+
+script:
+  - crystal spec
+  - crystal tool format --check

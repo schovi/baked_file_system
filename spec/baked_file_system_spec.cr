@@ -88,7 +88,7 @@ describe BakedFileSystem do
   end
 
   it "handles interpolation in content" do
-    String.new(Storage.get("string_encoding/interpolation.gz").to_slice).should eq "\#{foo} \{% macro %}\n"
+    String.new(Storage.get("string_encoding/interpolation.gz").to_slice).should eq "\#{foo} {% macro %}\n"
   end
 
   describe ManualStorage do

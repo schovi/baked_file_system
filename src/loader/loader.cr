@@ -21,8 +21,8 @@ module BakedFileSystem
       result = [] of String
 
       files = Dir.glob(File.join(root_path, "**", "*"))
-                 # Reject hidden entities and directories
-                 .reject { |path| File.directory?(path) || !(path =~ /(\/\..+)/).nil? }
+        # Reject hidden entities and directories
+        .reject { |path| File.directory?(path) || !(path =~ /(\/\..+)/).nil? }
 
       files.each do |path|
         io << "bake_file BakedFileSystem::BakedFile.new(\n"
