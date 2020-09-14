@@ -1,5 +1,5 @@
 require "base64"
-require "gzip"
+require "compress/gzip"
 require "./baked_file_system/*"
 
 # A `BakedFileSystem` allows to include ("bake") static files into a compiled
@@ -51,7 +51,7 @@ module BakedFileSystem
     def initialize(@path, @mime_type, @size, @compressed, @slice : Bytes)
       @path = "/" + @path unless @path.starts_with? '/'
       @memory_io = IO::Memory.new(@slice)
-      @wrapped_io = compressed? ? @memory_io : Gzip::Reader.new(@memory_io)
+      @wrapped_io = compressed? ? @memory_io : Compress::Gzip::Reader.new(@memory_io)
     end
 
     def read(slice : Bytes)
@@ -65,13 +65,13 @@ module BakedFileSystem
       @slice.bytesize
     end
 
-    def write(slice : Bytes)
+    def write(slice : Bytes) : Nil
       raise "Can't write to BakedFileSystem::BakedFile"
     end
 
     def rewind
       @memory_io.rewind
-      @wrapped_io = compressed? ? @memory_io : Gzip::Reader.new(@memory_io)
+      @wrapped_io = compressed? ? @memory_io : Compress::Gzip::Reader.new(@memory_io)
     end
 
     # Returns a `Bytes` holding the (compressed) content of this virtual file.

@@ -17,7 +17,7 @@ class BakedFileSystem::StringEncoder < IO
     raise "Can't read from StringEncoder"
   end
 
-  def write(slice : Bytes)
+  def write(slice : Bytes) : Nil
     slice.each do |byte|
       case byte
       when 34_u8, 35_u8, 92_u8, 123_u8
@@ -36,7 +36,7 @@ class BakedFileSystem::StringEncoder < IO
       else
         @io << "\\x"
         @io << '0' if byte < 0x10_u8
-        byte.to_s(16, @io, upcase: true)
+        byte.to_s(@io, 16, upcase: true)
       end
     end
   end
