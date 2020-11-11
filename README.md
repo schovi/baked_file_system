@@ -1,7 +1,5 @@
 # Baked File System
 
-[![Build Status](https://travis-ci.org/schovi/baked_file_system.svg?branch=master)](https://travis-ci.org/schovi/baked_file_system)
-
 Include (bake them) static files into a binary at compile time and access them anytime you need.
 
 ## Installation
