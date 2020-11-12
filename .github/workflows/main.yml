@@ -1,0 +1,30 @@
+name: Baked File System CI
+
+on: push
+
+jobs:
+  latest:
+    runs-on: ubuntu-latest
+
+    container:
+      image: crystallang/crystal:latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install dependencies
+      run: shards install
+    - name: Run tests
+      run: crystal spec
+
+  nightly:
+    runs-on: ubuntu-latest
+
+    container:
+      image: crystallang/crystal:nightly
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install dependencies
+      run: shards install
+    - name: Run tests
+      run: crystal spec
