@@ -11,7 +11,7 @@ Add this to your application's `shard.yml`:
 dependencies:
   baked_file_system:
     github: schovi/baked_file_system
-    version: 0.9.8
+    version: 0.10.0
 ```
 
 ## Usage
@@ -69,4 +69,5 @@ TODO: Write development instructions here
 
 ## Contributors
 
-- [schovi](https://github.com/schovi) David Schovanec - creator, maintainer
+- [schovi](https://github.com/schovi) David Schovanec
+- [straight-shoota](https://github.com/straight-shoota) Johannes Müller
