@@ -1,6 +1,8 @@
 name: Baked File System CI
 
-on: push
+on:
+  push:
+  pull_request:
 
 jobs:
   test:
