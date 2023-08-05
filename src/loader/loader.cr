@@ -20,13 +20,13 @@ module BakedFileSystem
 
       result = [] of String
 
-      files = Dir.glob(File.join(root_path, "**", "*"))
+      files = Dir.glob(Path[root_path].to_posix.join("**", "*"))
                  # Reject hidden entities and directories
                  .reject { |path| File.directory?(path) || !(path =~ /(\/\..+)/).nil? }
 
       files.each do |path|
         io << "bake_file BakedFileSystem::BakedFile.new(\n"
-        io << "  path:            " << path[root_path_length..-1].dump << ",\n"
+        io << "  path:            " << Path[path[root_path_length..]].to_posix.to_s.dump << ",\n"
         io << "  size:            " << File.info(path).size << ",\n"
         compressed = path.ends_with?("gz")
 

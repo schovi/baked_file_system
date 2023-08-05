@@ -1,30 +1,33 @@
 name: Baked File System CI
 
-on: push
+on:
+  push:
+  pull_request:
 
 jobs:
-  latest:
-    runs-on: ubuntu-latest
-
-    container:
-      image: crystallang/crystal:latest
-
-    steps:
-    - uses: actions/checkout@v2
-    - name: Install dependencies
-      run: shards install
-    - name: Run tests
-      run: crystal spec
-
-  nightly:
-    runs-on: ubuntu-latest
-
-    container:
-      image: crystallang/crystal:nightly
+  test:
+    name: Test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, crystal: latest }
+          - { os: ubuntu-latest, crystal: nightly }
+          - { os: macos-latest }
+          - { os: windows-latest }
+    runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Install dependencies
-      run: shards install
-    - name: Run tests
-      run: crystal spec
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: ${{ matrix.crystal }}
+
+      - name: Download source
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: shards install
+
+      - name: Run tests
+        run: crystal spec
