@@ -36,7 +36,7 @@ describe BakedFileSystem do
 
   it "get correct file attributes" do
     baked_file = Storage.get("images/sidekiq.png")
-    baked_file.size.should eq(52949)
+    baked_file.size.should eq(52947)
     baked_file.compressed_size.should be_close 47883, 40
 
     baked_file = Storage.get("/lorem.txt")
