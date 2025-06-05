@@ -29,7 +29,7 @@ class FileStorage
   extend BakedFileSystem
 
   bake_folder "/home/my_name/work/crystal_project/public"
-  bake_folder "../public", include_dotfiles: true # optionally includes dotfiles
+  bake_folder "../public", include_dotfiles: true
 end
 
 ```
@@ -38,6 +38,7 @@ Files can be loaded using `get` and `get?` class methods.
 
 ```crystal
 file = FileStorage.get("path/to/file.png")
+
 file.gets_to_end  # returns content of file
 file.path         # returns path of file
 file.size         # returns size of original file
@@ -52,6 +53,7 @@ begin
 rescue BakedFileSystem::NoSuchFileError
   puts "File #{path} is missing"
 end
+
 FileStorage.get? "missing/file" # => nil
 ```
 
