@@ -12,7 +12,7 @@ module BakedFileSystem
         raise Error.new "path does not exist: #{root_path}"
       elsif !File.directory?(root_path)
         raise Error.new "path is not a directory: #{root_path}"
-      elsif !File.readable?(root_path)
+      elsif !File::Info.readable?(root_path)
         raise Error.new "path is not readable: #{root_path}"
       end
 
