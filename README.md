@@ -20,6 +20,8 @@ A custom type that extends `BakedFileSystem` is used as a file system. The macro
 a given path into the virtual file system. Both relative and absolute paths are supported, as well as baking multiple
 folders.
 
+You can control whether dotfiles files and folders (those starting with a dot, like `.gitignore` or `.hidden/`) are included using the `include_dotfiles` option (default: `false`).
+
 ```crystal
 require "baked_file_system"
 
@@ -27,7 +29,7 @@ class FileStorage
   extend BakedFileSystem
 
   bake_folder "/home/my_name/work/crystal_project/public"
-  bake_folder "../public"
+  bake_folder "../public", include_dotfiles: true # optionally includes dotfiles
 end
 
 ```
@@ -36,10 +38,9 @@ Files can be loaded using `get` and `get?` class methods.
 
 ```crystal
 file = FileStorage.get("path/to/file.png")
-
 file.gets_to_end  # returns content of file
 file.path         # returns path of file
-file.size         # returns size of original file
+file.size         # returns size of original file
 ```
 
 When try to get missing file, `get` raises a `BakedFileSystem::NoSuchFileError` exception
@@ -51,7 +52,6 @@ begin
 rescue BakedFileSystem::NoSuchFileError
   puts "File #{path} is missing"
 end
-
 FileStorage.get? "missing/file" # => nil
 ```
 

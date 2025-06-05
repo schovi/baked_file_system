@@ -157,8 +157,8 @@ module BakedFileSystem
   macro extended
     @@files = [] of BakedFileSystem::BakedFile
 
-    macro bake_folder(path, dir = __DIR__, allow_empty = false)
-      BakedFileSystem.bake_folder(\{{ path }}, \{{ dir }}, \{{ allow_empty }})
+    macro bake_folder(path, dir = __DIR__, allow_empty = false, include_dotfiles = false)
+      BakedFileSystem.bake_folder(\{{ path }}, \{{ dir }}, \{{ allow_empty }}, \{{ include_dotfiles }})
     end
   end
 
@@ -175,12 +175,12 @@ module BakedFileSystem
   # Bakes all files in *path* into this baked file system.
   # If *path* is relative, it will be based on *dir* which defaults to `__DIR__`.
   # It will raise if there are no files found in *path* unless *allow_empty* is set to `true`.
-  macro bake_folder(path, dir = __DIR__, allow_empty = false)
+  macro bake_folder(path, dir = __DIR__, allow_empty = false, include_dotfiles = false)
     {% raise "BakedFileSystem.load expects `path` to be a StringLiteral." unless path.is_a?(StringLiteral) %}
 
     %files_size_ante = @@files.size
 
-    {{ run("./loader", path, dir) }}
+    {{ run("./loader", path, dir, include_dotfiles) }}
 
     {% unless allow_empty %}
     raise "BakedFileSystem empty: no files in #{File.expand_path({{ path }}, {{ dir }})}" if @@files.size - %files_size_ante == 0
