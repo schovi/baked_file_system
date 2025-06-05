@@ -20,8 +20,10 @@ module BakedFileSystem
 
       result = [] of String
 
-      files = Dir.glob(Path[root_path].to_posix.join("**", "*"), match_hidden: include_dotfiles)
-                 .reject { |path| File.directory?(path) }
+
+      pattern = Path[root_path].to_posix.join("**", "*").to_s
+      match_opt = include_dotfiles ? File::MatchOptions::DotFiles : File::MatchOptions.glob_default
+      files = Dir.glob(pattern, match: match_opt).reject { |path| File.directory?(path) }
 
       files.each do |path|
         io << "bake_file BakedFileSystem::BakedFile.new(\n"
