@@ -7,12 +7,12 @@ module BakedFileSystem
     class Error < Exception
     end
 
-    def self.load(io, root_path)
+    def self.load(io, root_path, include_dotfiles = false)
       if !File.exists?(root_path)
         raise Error.new "path does not exist: #{root_path}"
       elsif !File.directory?(root_path)
         raise Error.new "path is not a directory: #{root_path}"
-      elsif !File.readable?(root_path)
+      elsif !File::Info.readable?(root_path)
         raise Error.new "path is not readable: #{root_path}"
       end
 
@@ -20,9 +20,10 @@ module BakedFileSystem
 
       result = [] of String
 
-      files = Dir.glob(Path[root_path].to_posix.join("**", "*"))
-                 # Reject hidden entities and directories
-                 .reject { |path| File.directory?(path) || !(path =~ /(\/\..+)/).nil? }
+
+      pattern = Path[root_path].to_posix.join("**", "*").to_s
+      match_opt = include_dotfiles ? File::MatchOptions::DotFiles : File::MatchOptions.glob_default
+      files = Dir.glob(pattern, match: match_opt).reject { |path| File.directory?(path) }
 
       files.each do |path|
         io << "bake_file BakedFileSystem::BakedFile.new(\n"

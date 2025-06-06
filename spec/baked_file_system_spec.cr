@@ -21,6 +21,11 @@ class MutlipleStorage
   end
 end
 
+class StorageWithHidden
+  extend BakedFileSystem
+  bake_folder "./storage", include_dotfiles: true
+end
+
 def read_slice(path)
   File.open(path, "rb") do |io|
     Slice(UInt8).new(io.size).tap do |buf|
@@ -32,6 +37,11 @@ end
 describe BakedFileSystem do
   it "load only files without hidden one" do
     Storage.files.size.should eq(4)
+    Storage.get?(".hidden/hidden_file.txt").should be_nil
+  end
+
+  it "can include hidden files if requested" do
+    StorageWithHidden.get(".hidden/hidden_file.txt").gets_to_end.should eq "should not be included\n"
   end
 
   it "get correct file attributes" do
