@@ -1,0 +1,14 @@
+name: baked
+version: 0.1.0
+
+dependencies:
+  kemal:
+    github: kemalcr/kemal
+  baked_file_system:
+    path: ../..
+
+crystal: ">= 1.0.0"
+
+targets:
+  baked:
+    main: baked.cr

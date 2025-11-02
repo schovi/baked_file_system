@@ -1,0 +1,12 @@
+name: baseline
+version: 0.1.0
+
+dependencies:
+  kemal:
+    github: kemalcr/kemal
+
+crystal: ">= 1.0.0"
+
+targets:
+  baseline:
+    main: baseline.cr
