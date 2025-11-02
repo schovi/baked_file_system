@@ -16,45 +16,104 @@ dependencies:
 
 ## Usage
 
-A custom type that extends `BakedFileSystem` is used as a file system. The macro `bake_folder` bakes all files in
-a given path into the virtual file system. Both relative and absolute paths are supported, as well as baking multiple
-folders.
-
-You can control whether dotfiles files and folders (those starting with a dot, like `.gitignore` or `.hidden/`) are included using the `include_dotfiles` option (default: `false`).
+Create a class that extends `BakedFileSystem` and use `bake_folder` to include static files at compile time.
 
 ```crystal
 require "baked_file_system"
 
-class FileStorage
+class Assets
   extend BakedFileSystem
 
-  bake_folder "/home/my_name/work/crystal_project/public"
-  bake_folder "../public", include_dotfiles: true
+  bake_folder "./public"
+  bake_folder "./views", include_dotfiles: true
 end
-
 ```
 
-Files can be loaded using `get` and `get?` class methods.
+**Options:**
+- `bake_folder(path, dir = __DIR__, allow_empty: false, include_dotfiles: false)` - Bake all files in a directory
+- `include_dotfiles: true` - Include files/folders starting with `.` (e.g., `.gitignore`)
+- `allow_empty: false` - Raise error if folder is empty
+
+### Loading Files
 
 ```crystal
-file = FileStorage.get("path/to/file.png")
+# Get file or raise BakedFileSystem::NoSuchFileError
+file = Assets.get("path/to/file.txt")
 
-file.gets_to_end  # returns content of file
-file.path         # returns path of file
-file.size         # returns size of original file
+# Get file or nil
+file = Assets.get?("path/to/file.txt")
+
+# Read file content as String
+content = Assets.get("file.txt").gets_to_end
+
+# List all baked files
+Assets.files.each do |file|
+  puts "#{file.path} (#{file.size} bytes)"
+end
 ```
 
-When try to get missing file, `get` raises a `BakedFileSystem::NoSuchFileError` exception
-while `get?` returns `nil`.
+### File Properties
 
 ```crystal
+file = Assets.get("document.pdf")
+
+file.path          # => "/document.pdf"
+file.size          # => 10240 (original uncompressed size)
+file.compressed?   # => true (all files are automatically compressed)
+file.compressed_size # => 3120 (actual stored size in binary)
+```
+
+### Compression
+
+Files are automatically gzip-compressed at compile time to reduce binary size. This is transparent - reading a file automatically decompresses it.
+
+**Special case:** Files ending in `.gz` are stored compressed as-is (no double compression).
+
+```crystal
+# Both work the same - automatic decompression on read
+Assets.get("file.txt").gets_to_end
+Assets.get("file.txt.gz").gets_to_end
+```
+
+### Advanced
+
+Add files programmatically:
+
+```crystal
+class Assets
+  extend BakedFileSystem
+
+  bake_folder "./public"
+  bake_file "/generated.json", %({"created": true})
+end
+```
+
+Write file to IO with optional compression:
+
+```crystal
+file = Assets.get("document.pdf")
+
+# Write decompressed content
+file.write_to_io(io, compressed: false)
+
+# Write original compressed content
+file.write_to_io(io, compressed: true)
+```
+
+### Error Handling
+
+```crystal
+# Raise on missing file
 begin
-  FileStorage.get "missing/file"
+  Assets.get("missing/file")
 rescue BakedFileSystem::NoSuchFileError
-  puts "File #{path} is missing"
+  puts "File not found"
 end
 
-FileStorage.get? "missing/file" # => nil
+# Or use safe access
+unless file = Assets.get?("missing/file")
+  puts "File not found"
+end
 ```
 
 ## Development
