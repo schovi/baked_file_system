@@ -49,7 +49,7 @@ module MemoryBenchmark
     output.to_s.lines.first.strip
   end
 
-  def self.get_rss_mb(pid : Int32) : Float64?
+  def self.get_rss_mb(pid : Int64) : Float64?
     # Use ps command to get RSS in KB, then convert to MB
     output = IO::Memory.new
     result = Process.run("ps", ["-o", "rss=", "-p", pid.to_s], output: output, error: Process::Redirect::Close)
