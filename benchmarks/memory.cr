@@ -72,7 +72,7 @@ module MemoryBenchmark
         if (Time.monotonic - start).total_seconds > timeout
           return false
         end
-        sleep 0.1
+        sleep 0.1.seconds
       end
     end
   end
@@ -83,7 +83,7 @@ module MemoryBenchmark
       HTTP::Client.get("http://localhost:#{port}/files/small.txt")
     rescue
     end
-    sleep 0.5
+    sleep 0.5.seconds
   end
 
   def self.profile_server(name : String, dir : String, port : Int32) : MemoryProfile
@@ -110,7 +110,7 @@ module MemoryBenchmark
       raise "Server failed to start on port #{port}"
     end
 
-    sleep WARMUP_DELAY
+    sleep WARMUP_DELAY.seconds
     measurements = [] of Float64
 
     # Measure startup RSS
@@ -121,7 +121,7 @@ module MemoryBenchmark
 
     # Access small file
     HTTP::Client.get("http://localhost:#{port}/files/small.txt")
-    sleep 0.2
+    sleep 0.2.seconds
     after_small = get_rss_mb(pid)
     raise "Failed to get RSS" unless after_small
     measurements << after_small
@@ -129,7 +129,7 @@ module MemoryBenchmark
 
     # Access medium file
     HTTP::Client.get("http://localhost:#{port}/files/medium.json")
-    sleep 0.2
+    sleep 0.2.seconds
     after_medium = get_rss_mb(pid)
     raise "Failed to get RSS" unless after_medium
     measurements << after_medium
@@ -137,7 +137,7 @@ module MemoryBenchmark
 
     # Access large file
     HTTP::Client.get("http://localhost:#{port}/files/large.dat")
-    sleep 0.2
+    sleep 0.2.seconds
     after_large = get_rss_mb(pid)
     raise "Failed to get RSS" unless after_large
     measurements << after_large
@@ -146,7 +146,7 @@ module MemoryBenchmark
     # Trigger GC and measure
     trigger_gc(port)
     GC.collect # Suggest GC in benchmark process too
-    sleep 1
+    sleep 1.second
     after_gc = get_rss_mb(pid)
     raise "Failed to get RSS" unless after_gc
     measurements << after_gc
@@ -211,7 +211,7 @@ module MemoryBenchmark
         end
       end
     end
-    sleep 1
+    sleep 1.second
   end
 
   def self.run
@@ -234,7 +234,7 @@ module MemoryBenchmark
     baseline_profile = profile_server("Baseline (File I/O)", BASELINE_DIR, BASELINE_PORT)
 
     # Wait a bit between tests
-    sleep 2
+    sleep 2.seconds
 
     # Profile baked
     baked_profile = profile_server("Baked (BakedFileSystem)", BAKED_DIR, BAKED_PORT)

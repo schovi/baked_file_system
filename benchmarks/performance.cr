@@ -75,7 +75,7 @@ module PerformanceBenchmark
         if (Time.monotonic - start).total_seconds > timeout
           return false
         end
-        sleep 0.1
+        sleep 0.1.seconds
       end
     end
   end
@@ -227,7 +227,7 @@ module PerformanceBenchmark
         end
       end
     end
-    sleep 1
+    sleep 1.second
   end
 
   def self.start_server(dir : String, port : Int32) : Process
@@ -247,7 +247,7 @@ module PerformanceBenchmark
       raise "Server failed to start on port #{port}"
     end
 
-    sleep 1 # Additional warmup
+    sleep 1.second # Additional warmup
     process
   end
 
