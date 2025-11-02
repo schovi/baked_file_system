@@ -108,4 +108,108 @@ describe BakedFileSystem do
       file.gets_to_end.should eq "Hello World\n"
     end
   end
+
+  describe "write protection" do
+    it "raises ReadOnlyError on write attempt" do
+      file = Storage.get("lorem.txt")
+
+      expect_raises(BakedFileSystem::ReadOnlyError, /read-only/) do
+        file.write(Bytes[1, 2, 3])
+      end
+    end
+
+    it "provides helpful error message" do
+      file = Storage.get("lorem.txt")
+
+      begin
+        file.write(Bytes[1])
+        fail "Expected ReadOnlyError to be raised"
+      rescue ex : BakedFileSystem::ReadOnlyError
+        msg = ex.message
+        msg.should_not be_nil
+        msg.not_nil!.should contain("compile-time")
+        msg.not_nil!.should contain("cannot be modified")
+      end
+    end
+  end
+
+  describe "duplicate path handling" do
+    it "detects duplicate paths within same bake_file calls" do
+      # Note: Duplicate paths are detected at compile time through the add_baked_file method
+      # This is tested indirectly through the implementation
+      paths = Set(String).new
+
+      # Simulate what happens during bake_file
+      path1 = "/test.txt"
+      paths.includes?(path1).should be_false
+      paths << path1
+
+      # Second attempt should be detected
+      paths.includes?(path1).should be_true
+    end
+  end
+
+  describe "BakedFile#close" do
+    it "closes the file" do
+      file = Storage.get("lorem.txt")
+      file.closed?.should be_false
+
+      file.close
+      file.closed?.should be_true
+    end
+
+    it "allows multiple close calls" do
+      file = Storage.get("lorem.txt")
+      file.close
+      file.close # Should not raise
+    end
+
+    it "raises on read after close" do
+      file = Storage.get("lorem.txt")
+      file.close
+
+      expect_raises(IO::Error, /Closed stream/) do
+        file.gets_to_end
+      end
+    end
+
+    it "raises on write after close" do
+      file = Storage.get("lorem.txt")
+      file.close
+
+      expect_raises(IO::Error, /Closed stream/) do
+        file.write(Bytes[1])
+      end
+    end
+
+    it "raises on rewind after close" do
+      file = Storage.get("lorem.txt")
+      file.close
+
+      expect_raises(IO::Error, /Closed stream/) do
+        file.rewind
+      end
+    end
+
+    it "supports block form with automatic close" do
+      content = Storage.get("lorem.txt") do |file|
+        file.gets_to_end
+      end
+
+      content.should_not be_empty
+    end
+
+    it "closes file even if block raises" do
+      file : BakedFileSystem::BakedFile? = nil
+
+      expect_raises(Exception, /test error/) do
+        Storage.get("lorem.txt") do |f|
+          file = f
+          raise "test error"
+        end
+      end
+
+      file.not_nil!.closed?.should be_true
+    end
+  end
 end

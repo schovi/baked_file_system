@@ -17,26 +17,38 @@ class BakedFileSystem::StringEncoder < IO
     raise "Can't read from StringEncoder"
   end
 
+  # Encodes binary data as Crystal string literal.
+  # Escapes special characters: ", #, \, {
+  # Converts control characters to escape sequences.
+  # Non-printable bytes become hex escapes (\xNN).
   def write(slice : Bytes) : Nil
     slice.each do |byte|
-      case byte
-      when 34_u8, 35_u8, 92_u8, 123_u8
-        # escape `"` (string delimiter), `#` (string interpolation), `\\` (escape character) and `{` (macro expression)
+      case byte.chr
+      when '"', '#', '\\', '{'
         @io << '\\'
         @io.write_byte byte
-      when 32_u8..127_u8
-        @io.write_byte byte
-      when  8_u8 then @io << "\\b"
-      when  9_u8 then @io << "\\t"
-      when 10_u8 then @io << "\\n"
-      when 11_u8 then @io << "\\v"
-      when 12_u8 then @io << "\\f"
-      when 13_u8 then @io << "\\r"
-      when 27_u8 then @io << "\\e"
+      when '\b'
+        @io << "\\b"
+      when '\t'
+        @io << "\\t"
+      when '\n'
+        @io << "\\n"
+      when '\v'
+        @io << "\\v"
+      when '\f'
+        @io << "\\f"
+      when '\r'
+        @io << "\\r"
+      when '\e'
+        @io << "\\e"
       else
-        @io << "\\x"
-        @io << '0' if byte < 0x10_u8
-        byte.to_s(@io, 16, upcase: true)
+        if byte >= 32 && byte < 127
+          @io.write_byte byte
+        else
+          @io << "\\x"
+          @io << '0' if byte < 0x10_u8
+          byte.to_s(@io, 16, upcase: true)
+        end
       end
     end
   end
