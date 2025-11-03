@@ -25,7 +25,48 @@ module BakedFileSystem
   class NoSuchFileError < Exception
   end
 
+  # This error is raised when attempting to write to a read-only `BakedFile`.
+  # Files embedded at compile-time cannot be modified at runtime.
+  class ReadOnlyError < Exception
+  end
+
+  # This error is raised when attempting to bake a file with a path that already exists.
+  # Duplicate file paths can occur when multiple `bake_folder` calls include files
+  # with the same relative path.
+  class DuplicatePathError < Exception
+  end
+
   # `BakedFile` represents a virtual file in a `BakedFileSystem`.
+  #
+  # BakedFile is a read-only IO wrapper around files embedded at compile-time.
+  # Write operations will raise `ReadOnlyError` since embedded files cannot be
+  # modified at runtime.
+  #
+  # ## Architecture
+  #
+  # Files are stored compressed in the binary's read-only data section as byte slices.
+  # On first access, BakedFile creates:
+  #
+  # 1. **Memory IO**: Wraps the compressed byte slice
+  # 2. **Gzip Reader**: Wraps the memory IO for transparent decompression
+  # 3. **Wrapped IO**: Either the memory IO (for .gz files) or gzip reader
+  #
+  # This lazy-loading approach minimizes memory usage:
+  # - Compressed data stays in read-only binary section
+  # - Decompression happens on-demand during read
+  # - No heap allocation unless content is explicitly stored
+  #
+  # ## Streaming Behavior
+  #
+  # BakedFile is a forward-only stream by default:
+  # - Read operations consume the stream
+  # - Call `rewind` to return to the beginning
+  # - Each `rewind` recreates the decompression reader (see `#rewind` for details)
+  #
+  # ## Thread Safety
+  #
+  # Each call to `get()` or `get?()` returns a new BakedFile instance with
+  # independent state, making concurrent access safe.
   #
   # # Usage
   #
@@ -46,6 +87,8 @@ module BakedFileSystem
     # Returns whether this file is compressed. If not, it is decompressed on read.
     getter? compressed : Bool
 
+    @closed : Bool = false
+
     def initialize(@path, @size, @compressed, @slice : Bytes)
       @path = "/" + @path unless @path.starts_with? '/'
       @memory_io = IO::Memory.new(@slice)
@@ -53,6 +96,7 @@ module BakedFileSystem
     end
 
     def read(slice : Bytes)
+      check_open
       @wrapped_io.read(slice)
     end
 
@@ -64,12 +108,74 @@ module BakedFileSystem
     end
 
     def write(slice : Bytes) : Nil
-      raise "Can't write to BakedFileSystem::BakedFile"
+      check_open
+      raise ReadOnlyError.new("BakedFile is read-only. Files embedded at compile-time cannot be modified at runtime.")
     end
 
+    # Rewinds the file to the beginning for re-reading.
+    #
+    # ## Implementation Note
+    #
+    # This method recreates the gzip decompression reader instead of rewinding it
+    # because `Compress::Gzip::Reader` is a forward-only stream that doesn't support
+    # seeking backward. This is intentional and necessary for correct behavior.
+    #
+    # ### Why Recreation is Required
+    #
+    # - `Compress::Gzip::Reader` maintains internal state during decompression
+    # - This state cannot be reset to return to the beginning
+    # - Creating a new reader over the rewound underlying stream is the only way to re-read
+    #
+    # ### Performance Implications
+    #
+    # - Creating a new reader is fast (no decompression happens yet)
+    # - Decompression happens on-demand during read operations
+    # - Memory usage is minimal (same underlying byte slice is reused)
+    # - This is the standard approach for streaming decompression
+    #
+    # ### Alternatives Considered
+    #
+    # **Cache decompressed content:**
+    # - Pro: True rewind without recreation
+    # - Con: Significant memory overhead (defeats purpose of streaming)
+    # - Con: Not suitable for large files
+    # - Decision: Rejected
+    #
+    # **Add seeking to Gzip::Reader:**
+    # - Pro: More intuitive API
+    # - Con: Requires changes to Crystal standard library
+    # - Con: Decompression algorithms are inherently forward-only
+    # - Decision: Not feasible
     def rewind
+      check_open
       @memory_io.rewind
       @wrapped_io = compressed? ? @memory_io : Compress::Gzip::Reader.new(@memory_io)
+      nil
+    end
+
+    # Returns true if the file has been closed.
+    def closed? : Bool
+      @closed
+    end
+
+    # Closes the file and releases resources.
+    # Can be called multiple times safely.
+    # After closing, read operations will raise IO::Error.
+    def close : Nil
+      return if @closed
+
+      @wrapped_io.close if @wrapped_io.responds_to?(:close)
+      @memory_io.close if @memory_io.responds_to?(:close)
+      @closed = true
+    end
+
+    # Ensures resources are freed when the object is garbage collected.
+    def finalize
+      close
+    end
+
+    private def check_open
+      raise IO::Error.new("Closed stream") if @closed
     end
 
     # Returns a `Bytes` holding the (compressed) content of this virtual file.
@@ -134,19 +240,54 @@ module BakedFileSystem
     get?(path) || raise NoSuchFileError.new("get: #{path}: No such file")
   end
 
+  # Opens a file and yields it to the block, ensuring it's closed afterwards.
+  #
+  # ```
+  # MyFiles.get("file.txt") do |file|
+  #   file.gets_to_end
+  # end
+  # ```
+  def get(path : String, &block : BakedFile -> T) : T forall T
+    file = get(path)
+    begin
+      yield file
+    ensure
+      file.close
+    end
+  end
+
   # Returns a `BakedFile` at *path* or `nil` if the virtual file does not exist.
   def get?(path : String) : BakedFile?
     path = path.strip
     path = "/" + path unless path.starts_with?("/")
 
-    file = @@files.find do |file|
+    template = @@files.find do |file|
       file.path == path
     end
 
+    return nil unless template
+
+    # Create a new instance to ensure thread safety and independent state
+    BakedFile.new(template.path, template.size, template.compressed?, template.to_slice)
+  end
+
+  # Opens a file and yields it to the block, ensuring it's closed afterwards.
+  # Returns nil if the file does not exist.
+  #
+  # ```
+  # MyFiles.get?("file.txt") do |file|
+  #   file.gets_to_end
+  # end
+  # ```
+  def get?(path : String, &block : BakedFile -> T) : T? forall T
+    file = get?(path)
     return nil unless file
 
-    file.rewind
-    file
+    begin
+      yield file
+    ensure
+      file.close
+    end
   end
 
   # Returns all virtual files in this file system.
@@ -156,9 +297,18 @@ module BakedFileSystem
 
   macro extended
     @@files = [] of BakedFileSystem::BakedFile
+    @@paths = Set(String).new
 
     macro bake_folder(path, dir = __DIR__, allow_empty = false, include_dotfiles = false)
       BakedFileSystem.bake_folder(\{{ path }}, \{{ dir }}, \{{ allow_empty }}, \{{ include_dotfiles }})
+    end
+
+    def self.add_baked_file(file : BakedFileSystem::BakedFile)
+      if @@paths.includes?(file.path)
+        raise BakedFileSystem::DuplicatePathError.new("Duplicate file path: #{file.path}. File already baked.")
+      end
+      @@paths << file.path
+      @@files << file
     end
   end
 
@@ -189,7 +339,7 @@ module BakedFileSystem
 
   # Adds a baked *file* to this file system.
   def bake_file(file : BakedFile)
-    @@files << file
+    add_baked_file(file)
   end
 
   # Creates a `BakedFile` at *path* with content *content* and adds it to this file system.
