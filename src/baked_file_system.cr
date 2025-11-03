@@ -310,6 +310,14 @@ module BakedFileSystem
       @@paths << file.path
       @@files << file
     end
+
+    def self.add_baked_file(file : BakedFileSystem::BakedFile)
+      if @@paths.includes?(file.path)
+        raise BakedFileSystem::DuplicatePathError.new("Duplicate file path: #{file.path}. File already baked.")
+      end
+      @@paths << file.path
+      @@files << file
+    end
   end
 
   # Creates a baked file system and loads contents of files in *path*.
