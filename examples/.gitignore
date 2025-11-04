@@ -1,0 +1,6 @@
+# Compiled binaries
+warning_example
+threshold_example
+
+# Debug symbols
+*.dwarf

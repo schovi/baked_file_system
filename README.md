@@ -30,9 +30,10 @@ end
 ```
 
 **Options:**
-- `bake_folder(path, dir = __DIR__, allow_empty: false, include_dotfiles: false)` - Bake all files in a directory
+- `bake_folder(path, dir = __DIR__, allow_empty: false, include_dotfiles: false, max_size: nil)` - Bake all files in a directory
 - `include_dotfiles: true` - Include files/folders starting with `.` (e.g., `.gitignore`)
 - `allow_empty: false` - Raise error if folder is empty
+- `max_size: Int64` - Maximum total compressed size in bytes (compilation fails if exceeded)
 
 ### Loading Files
 
@@ -74,6 +75,59 @@ Files are automatically gzip-compressed at compile time to reduce binary size. T
 Assets.get("file.txt").gets_to_end
 Assets.get("file.txt.gz").gets_to_end
 ```
+
+### Size Management & Limits
+
+BakedFileSystem automatically reports compilation statistics to help you monitor binary size impact:
+
+```
+BakedFileSystem: Embedded 42 files (2.3 MB → 890.0 KB compressed, 38.7% ratio)
+```
+
+#### Compilation Warnings
+
+Automatic warnings help catch potential issues:
+
+```
+⚠️  WARNING: Large file detected: /images/demo.mp4 (45.2 MB → 38.1 MB)
+⚠️  WARNING: Total embedded size (12.5 MB) is significant.
+    Consider using lazy loading or external storage for large assets.
+```
+
+#### Size Limits
+
+Enforce maximum size limits per folder:
+
+```crystal
+class Assets
+  extend BakedFileSystem
+
+  # Compilation will fail if compressed size exceeds 10 MB
+  bake_folder "./images", max_size: 10_485_760  # 10 MB in bytes
+end
+```
+
+#### Environment Variable Configuration
+
+Configure limits globally via environment variables:
+
+```bash
+# Set maximum total size (default: 50 MB)
+export BAKED_FILE_SYSTEM_MAX_SIZE=104857600  # 100 MB
+
+# Set warning threshold (default: 10 MB)
+export BAKED_FILE_SYSTEM_WARN_THRESHOLD=5242880  # 5 MB
+
+crystal build your_app.cr
+```
+
+#### Best Practices
+
+- **Keep total embedded size under 50 MB** for reasonable binary sizes
+- **Use runtime loading for very large assets** (> 10 MB per file)
+- **Review compilation statistics** to catch accidentally embedded files
+- **Use `.gitignore`-style patterns** (future feature) to exclude build artifacts
+- **Monitor benchmark results** to understand compile time and binary size impact
 
 ### Advanced
 
