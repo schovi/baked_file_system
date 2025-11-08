@@ -57,7 +57,31 @@ module BakedFileSystem
       !regex.match(normalized_file).nil?
     end
 
-    def self.load(io, root_path, include_dotfiles = false, max_size : Int64? = nil)
+    # Filters a list of files based on include and exclude patterns
+    # If include patterns are provided, only files matching at least one include pattern are kept
+    # Then, files matching any exclude pattern are removed
+    # Returns filtered array of file paths
+    def self.filter_files(files : Array(String), include_patterns : Array(String)?, exclude_patterns : Array(String)?) : Array(String)
+      result = files
+
+      # Apply include filters first - if specified, keep only matching files
+      if include_patterns && !include_patterns.empty?
+        result = result.select do |file|
+          include_patterns.any? { |pattern| matches_pattern?(file, pattern) }
+        end
+      end
+
+      # Apply exclude filters - remove any matching files
+      if exclude_patterns && !exclude_patterns.empty?
+        result = result.reject do |file|
+          exclude_patterns.any? { |pattern| matches_pattern?(file, pattern) }
+        end
+      end
+
+      result
+    end
+
+    def self.load(io, root_path, include_dotfiles = false, include_patterns : Array(String)? = nil, exclude_patterns : Array(String)? = nil, max_size : Int64? = nil)
       if !File.exists?(root_path)
         raise Error.new "path does not exist: #{root_path}"
       elsif !File.directory?(root_path)
@@ -75,6 +99,20 @@ module BakedFileSystem
       pattern = Path[root_path].to_posix.join("**", "*").to_s
       match_opt = include_dotfiles ? File::MatchOptions::DotFiles : File::MatchOptions.glob_default
       files = Dir.glob(pattern, match: match_opt).reject { |path| File.directory?(path) }
+
+      # Apply filtering if include or exclude patterns are provided
+      if include_patterns || exclude_patterns
+        # Convert absolute paths to relative paths for pattern matching
+        relative_files = files.map { |path| Path[path[root_path_length..]].to_posix.to_s }
+        filtered_relative = filter_files(relative_files, include_patterns, exclude_patterns)
+
+        # Convert back to absolute paths
+        filtered_set = filtered_relative.to_set
+        files = files.select do |path|
+          relative = Path[path[root_path_length..]].to_posix.to_s
+          filtered_set.includes?(relative)
+        end
+      end
 
       files.each do |path|
         relative_path = Path[path[root_path_length..]].to_posix.to_s

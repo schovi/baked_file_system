@@ -124,7 +124,7 @@ describe BakedFileSystem::Loader do
       stdout = IO::Memory.new
 
       # Should complete successfully with a large max_size
-      BakedFileSystem::Loader.load(stdout, File.expand_path(File.join(__DIR__, "storage")), false, 10_000_000_i64)
+      BakedFileSystem::Loader.load(stdout, File.expand_path(File.join(__DIR__, "storage")), false, nil, nil, 10_000_000_i64)
 
       # Should generate code for the files
       stdout.to_s.should contain("BakedFile.new")
@@ -289,6 +289,72 @@ describe BakedFileSystem::Loader::ByteCounter do
     counter.count.should eq(11)
 
     io.to_s.should eq("hello world")
+  end
+end
+
+describe "BakedFileSystem::Loader file filtering" do
+  describe ".filter_files" do
+    it "returns all files when no patterns provided" do
+      files = ["src/main.cr", "src/lib.cr", "test/spec.cr"]
+      result = BakedFileSystem::Loader.filter_files(files, nil, nil)
+      result.should eq(files)
+    end
+
+    it "filters by include patterns only" do
+      files = ["src/main.cr", "src/lib.cr", "test/spec.cr", "README.md"]
+      include_patterns = ["**/*.cr"]
+      result = BakedFileSystem::Loader.filter_files(files, include_patterns, nil)
+      result.should eq(["src/main.cr", "src/lib.cr", "test/spec.cr"])
+    end
+
+    it "filters by exclude patterns only" do
+      files = ["src/main.cr", "src/lib.cr", "test/spec.cr", "README.md"]
+      exclude_patterns = ["**/test/*"]
+      result = BakedFileSystem::Loader.filter_files(files, nil, exclude_patterns)
+      result.should eq(["src/main.cr", "src/lib.cr", "README.md"])
+    end
+
+    it "applies include then exclude patterns" do
+      files = ["src/main.cr", "src/test_helper.cr", "test/spec.cr", "README.md"]
+      include_patterns = ["**/*.cr"]
+      exclude_patterns = ["**/test/*", "**/*test*.cr"]
+      result = BakedFileSystem::Loader.filter_files(files, include_patterns, exclude_patterns)
+      result.should eq(["src/main.cr"])
+    end
+
+    it "handles multiple include patterns (OR logic)" do
+      files = ["src/main.cr", "docs/guide.md", "README.txt", "config.yml"]
+      include_patterns = ["**/*.cr", "**/*.md"]
+      result = BakedFileSystem::Loader.filter_files(files, include_patterns, nil)
+      result.should eq(["src/main.cr", "docs/guide.md"])
+    end
+
+    it "handles multiple exclude patterns (OR logic)" do
+      files = ["src/main.cr", "test/spec.cr", "docs/README.md", "build/output.txt"]
+      exclude_patterns = ["**/test/*", "**/build/*"]
+      result = BakedFileSystem::Loader.filter_files(files, nil, exclude_patterns)
+      result.should eq(["src/main.cr", "docs/README.md"])
+    end
+
+    it "returns empty array when all files filtered out" do
+      files = ["test/unit.cr", "test/integration.cr"]
+      exclude_patterns = ["**/test/*"]
+      result = BakedFileSystem::Loader.filter_files(files, nil, exclude_patterns)
+      result.should be_empty
+    end
+
+    it "handles empty file list" do
+      files = [] of String
+      include_patterns = ["**/*.cr"]
+      result = BakedFileSystem::Loader.filter_files(files, include_patterns, nil)
+      result.should be_empty
+    end
+
+    it "handles empty pattern arrays" do
+      files = ["src/main.cr"]
+      result = BakedFileSystem::Loader.filter_files(files, [] of String, [] of String)
+      result.should eq(files)
+    end
   end
 end
 
