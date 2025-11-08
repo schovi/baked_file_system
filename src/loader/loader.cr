@@ -9,6 +9,54 @@ module BakedFileSystem
     class Error < Exception
     end
 
+    # Converts a glob pattern to a regular expression
+    # Supports: * (any chars), ** (recursive dirs), ? (single char)
+    private def self.glob_to_regex(pattern : String) : Regex
+      # Escape regex special chars except glob wildcards
+      escaped = pattern.gsub(/([.+^$(){}[\]|\\])/, "\\\\\\1")
+
+      # Convert glob patterns to regex
+      # Use placeholders to prevent ** patterns from being affected by * replacement
+      # Handle ** (recursive directories) - must match zero or more path segments
+
+      # Replace **/ with placeholder (e.g., "**/file.txt" should match "file.txt" and "a/b/file.txt")
+      escaped = escaped.gsub("**/", "<<<DOUBLESTAR_SLASH>>>")
+
+      # Replace /** with placeholder (e.g., "test/**" should match "test/file" and "test/a/b/file")
+      escaped = escaped.gsub("/**", "<<<SLASH_DOUBLESTAR>>>")
+
+      # Handle remaining * (any characters except path separator)
+      escaped = escaped.gsub("*", "[^/]*")
+
+      # Handle ? (single character except path separator)
+      escaped = escaped.gsub("?", "[^/]")
+
+      # Now replace placeholders with actual regex patterns
+      # **/ means "zero or more directory levels followed by /" OR just ""
+      escaped = escaped.gsub("<<<DOUBLESTAR_SLASH>>>", "(?:(?:[^/]+/)*)?")
+
+      # /** means "/" followed by anything OR just ""
+      escaped = escaped.gsub("<<<SLASH_DOUBLESTAR>>>", "(?:/.*)?")
+
+      # Anchor the pattern to match full path
+      Regex.new("^#{escaped}$")
+    end
+
+    # Checks if a file path matches a glob pattern
+    # Patterns are matched against posix-style paths (using / separator)
+    def self.matches_pattern?(file : String, pattern : String) : Bool
+      # Normalize both file and pattern to use forward slashes
+      normalized_file = file.gsub("\\", "/")
+      normalized_pattern = pattern.gsub("\\", "/")
+
+      # Remove leading slash from file if present for consistent matching
+      normalized_file = normalized_file.lchop('/')
+      normalized_pattern = normalized_pattern.lchop('/')
+
+      regex = glob_to_regex(normalized_pattern)
+      !regex.match(normalized_file).nil?
+    end
+
     def self.load(io, root_path, include_dotfiles = false, max_size : Int64? = nil)
       if !File.exists?(root_path)
         raise Error.new "path does not exist: #{root_path}"
