@@ -11,10 +11,12 @@ exclude_patterns : Array(String)? = nil
 if ARGV[3]? && ARGV[3] != "nil"
   begin
     filter_data = JSON.parse(ARGV[3])
-    if filter_data["include"]?
+    # Check if include key exists and is not null
+    if filter_data["include"]? && filter_data["include"].raw != nil
       include_patterns = filter_data["include"].as_a.map(&.as_s)
     end
-    if filter_data["exclude"]?
+    # Check if exclude key exists and is not null
+    if filter_data["exclude"]? && filter_data["exclude"].raw != nil
       exclude_patterns = filter_data["exclude"].as_a.map(&.as_s)
     end
   rescue ex : JSON::ParseException

@@ -343,11 +343,22 @@ module BakedFileSystem
 
     # Serialize filter patterns as JSON for passing to loader process
     {% if include_patterns || exclude_patterns %}
-      %filter_json = {
-        include: {{ include_patterns }},
-        exclude: {{ exclude_patterns }}
-      }.to_json
-      {{ run("./loader", path, dir, include_dotfiles, "%filter_json", max_size || "nil") }}
+      # Build JSON string manually at compile time
+      {% json_parts = [] of String %}
+      {% if include_patterns %}
+        {% include_json = "\"include\":[" + include_patterns.map { |p| "\"" + p + "\"" }.join(",") + "]" %}
+        {% json_parts << include_json %}
+      {% else %}
+        {% json_parts << "\"include\":null" %}
+      {% end %}
+      {% if exclude_patterns %}
+        {% exclude_json = "\"exclude\":[" + exclude_patterns.map { |p| "\"" + p + "\"" }.join(",") + "]" %}
+        {% json_parts << exclude_json %}
+      {% else %}
+        {% json_parts << "\"exclude\":null" %}
+      {% end %}
+      {% filter_json = "{" + json_parts.join(",") + "}" %}
+      {{ run("./loader", path, dir, include_dotfiles, filter_json, max_size || "nil") }}
     {% else %}
       {{ run("./loader", path, dir, include_dotfiles, "nil", max_size || "nil") }}
     {% end %}
