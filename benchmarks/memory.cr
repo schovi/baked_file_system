@@ -5,12 +5,12 @@ require "http/client"
 # Measures RSS (Resident Set Size) at various stages
 
 module MemoryBenchmark
-  BASELINE_DIR = File.expand_path("baseline", __DIR__)
-  BAKED_DIR = File.expand_path("baked", __DIR__)
-  RESULTS_FILE = File.expand_path("results/memory.json", __DIR__)
+  BASELINE_DIR  = File.expand_path("baseline", __DIR__)
+  BAKED_DIR     = File.expand_path("baked", __DIR__)
+  RESULTS_FILE  = File.expand_path("results/memory.json", __DIR__)
   BASELINE_PORT = 3000
-  BAKED_PORT = 3001
-  WARMUP_DELAY = 2 # seconds to wait for server startup
+  BAKED_PORT    = 3001
+  WARMUP_DELAY  =    2 # seconds to wait for server startup
 
   struct MemoryProfile
     include JSON::Serializable

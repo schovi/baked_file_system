@@ -18,7 +18,7 @@ module Assets
   # - medium.bin: 50KB → ~50KB compressed
   # - large.bin: 100KB → ~100KB compressed
   # Total: ~150KB compressed
-  bake_folder path: "./assets", max_size: 51_200  # 50 KB limit - will fail!
+  bake_folder path: "./assets", max_size: 51_200 # 50 KB limit - will fail!
 end
 
 # This code will never execute because compilation fails above

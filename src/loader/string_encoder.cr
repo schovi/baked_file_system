@@ -8,7 +8,7 @@ class BakedFileSystem::StringEncoder < IO
   def initialize(@io : IO)
   end
 
-  def self.open(io : IO)
+  def self.open(io : IO, &)
     encoder = new(io)
     yield encoder ensure encoder.close
   end

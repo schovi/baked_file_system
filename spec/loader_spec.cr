@@ -234,7 +234,7 @@ describe BakedFileSystem::Loader::Stats do
       stats.add_file("/file.txt", 1000_i64, 500_i64)
 
       io = IO::Memory.new
-      stats.report_to(io, 1000_i64)  # Should not raise
+      stats.report_to(io, 1000_i64) # Should not raise
 
       output = io.to_s
       output.should contain("BakedFileSystem: Embedded 1 file")

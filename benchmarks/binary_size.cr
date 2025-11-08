@@ -5,8 +5,8 @@ require "json"
 
 module BinarySizeBenchmark
   BASELINE_DIR = File.expand_path("baseline", __DIR__)
-  BAKED_DIR = File.expand_path("baked", __DIR__)
-  PUBLIC_DIR = File.expand_path("public", __DIR__)
+  BAKED_DIR    = File.expand_path("baked", __DIR__)
+  PUBLIC_DIR   = File.expand_path("public", __DIR__)
   RESULTS_FILE = File.expand_path("results/binary_size.json", __DIR__)
 
   struct BinaryInfo

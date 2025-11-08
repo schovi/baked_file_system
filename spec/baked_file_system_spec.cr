@@ -84,7 +84,7 @@ end
 
 describe BakedFileSystem do
   it "load only files without hidden one" do
-    Storage.files.size.should eq(10)  # lorem.txt, images/sidekiq.png, string_encoding/*, filters/*
+    Storage.files.size.should eq(10) # lorem.txt, images/sidekiq.png, string_encoding/*, filters/*
     Storage.get?(".hidden/hidden_file.txt").should be_nil
   end
 
@@ -146,7 +146,7 @@ describe BakedFileSystem do
   end
 
   it "handles interpolation in content" do
-    String.new(Storage.get("string_encoding/interpolation.gz").to_slice).should eq "\#{foo} \{% macro %}\n"
+    String.new(Storage.get("string_encoding/interpolation.gz").to_slice).should eq "\#{foo} {% macro %}\n"
   end
 
   describe "rewind functionality" do
@@ -615,7 +615,7 @@ describe BakedFileSystem do
   describe "file filtering" do
     it "includes only files matching include patterns" do
       # Should only have .cr files
-      FilteredStorageInclude.files.size.should eq(4)  # src/main.cr, src/lib.cr, test/spec.cr, test/helper.cr
+      FilteredStorageInclude.files.size.should eq(4) # src/main.cr, src/lib.cr, test/spec.cr, test/helper.cr
       FilteredStorageInclude.get?("src/main.cr").should_not be_nil
       FilteredStorageInclude.get?("src/lib.cr").should_not be_nil
       FilteredStorageInclude.get?("test/spec.cr").should_not be_nil
@@ -626,7 +626,7 @@ describe BakedFileSystem do
 
     it "excludes files matching exclude patterns" do
       # Should have everything except test/* files
-      FilteredStorageExclude.files.size.should eq(4)  # src/*, docs/*, config.yml
+      FilteredStorageExclude.files.size.should eq(4) # src/*, docs/*, config.yml
       FilteredStorageExclude.get?("src/main.cr").should_not be_nil
       FilteredStorageExclude.get?("src/lib.cr").should_not be_nil
       FilteredStorageExclude.get?("docs/README.md").should_not be_nil
@@ -638,7 +638,7 @@ describe BakedFileSystem do
     it "applies both include and exclude patterns" do
       # Include *.cr and *.md, exclude test/*
       # Should have: src/*.cr and docs/*.md (not test/*.cr)
-      FilteredStorageCombined.files.size.should eq(3)  # src/main.cr, src/lib.cr, docs/README.md
+      FilteredStorageCombined.files.size.should eq(3) # src/main.cr, src/lib.cr, docs/README.md
       FilteredStorageCombined.get?("src/main.cr").should_not be_nil
       FilteredStorageCombined.get?("src/lib.cr").should_not be_nil
       FilteredStorageCombined.get?("docs/README.md").should_not be_nil

@@ -5,14 +5,14 @@ require "http/client"
 # Measures request latency and throughput
 
 module PerformanceBenchmark
-  BASELINE_DIR = File.expand_path("baseline", __DIR__)
-  BAKED_DIR = File.expand_path("baked", __DIR__)
-  RESULTS_FILE = File.expand_path("results/performance.json", __DIR__)
-  BASELINE_PORT = 3000
-  BAKED_PORT = 3001
-  WARMUP_REQUESTS = 100
+  BASELINE_DIR       = File.expand_path("baseline", __DIR__)
+  BAKED_DIR          = File.expand_path("baked", __DIR__)
+  RESULTS_FILE       = File.expand_path("results/performance.json", __DIR__)
+  BASELINE_PORT      = 3000
+  BAKED_PORT         = 3001
+  WARMUP_REQUESTS    =  100
   BENCHMARK_REQUESTS = 1000
-  CONCURRENT_CLIENTS = 10
+  CONCURRENT_CLIENTS =   10
 
   struct LatencyStats
     include JSON::Serializable

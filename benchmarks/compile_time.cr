@@ -5,9 +5,9 @@ require "file_utils"
 # Tests compilation time overhead of embedding assets
 
 module CompileTimeBenchmark
-  ITERATIONS = 5
+  ITERATIONS   = 5
   BASELINE_DIR = File.expand_path("baseline", __DIR__)
-  BAKED_DIR = File.expand_path("baked", __DIR__)
+  BAKED_DIR    = File.expand_path("baked", __DIR__)
   RESULTS_FILE = File.expand_path("results/compile_time.json", __DIR__)
 
   struct CompileResult
