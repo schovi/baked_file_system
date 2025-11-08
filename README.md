@@ -30,10 +30,74 @@ end
 ```
 
 **Options:**
-- `bake_folder(path, dir = __DIR__, allow_empty: false, include_dotfiles: false, max_size: nil)` - Bake all files in a directory
+- `bake_folder(path, dir = __DIR__, allow_empty: false, include_dotfiles: false, include_patterns: nil, exclude_patterns: nil, max_size: nil)` - Bake all files in a directory
 - `include_dotfiles: true` - Include files/folders starting with `.` (e.g., `.gitignore`)
 - `allow_empty: false` - Raise error if folder is empty
+- `include_patterns: Array(String)` - Include only files matching glob patterns
+- `exclude_patterns: Array(String)` - Exclude files matching glob patterns
 - `max_size: Int64` - Maximum total compressed size in bytes (compilation fails if exceeded)
+
+### File Filtering
+
+Use glob patterns to selectively include or exclude files when baking directories.
+
+**Pattern Syntax:**
+- `*` - Matches any characters except path separator (e.g., `*.cr` matches `file.cr`)
+- `**` - Matches zero or more directory levels (e.g., `**/*.cr` matches `src/file.cr`, `src/models/user.cr`)
+- `?` - Matches single character except path separator (e.g., `file?.txt` matches `file1.txt`)
+
+**Include Patterns** (whitelist approach):
+
+```crystal
+class Assets
+  extend BakedFileSystem
+
+  # Only include Crystal source files
+  bake_folder "./src", include_patterns: ["**/*.cr"]
+
+  # Include multiple file types
+  bake_folder "./docs", include_patterns: ["**/*.md", "**/*.txt"]
+end
+```
+
+**Exclude Patterns** (blacklist approach):
+
+```crystal
+class Assets
+  extend BakedFileSystem
+
+  # Exclude test and spec files
+  bake_folder "./project", exclude_patterns: ["**/test/*", "**/spec/*"]
+
+  # Exclude build artifacts and temporary files
+  bake_folder "./app", exclude_patterns: ["**/build/*", "**/*.tmp", "**/*.log"]
+end
+```
+
+**Combined Filtering** (include first, then exclude):
+
+```crystal
+class Assets
+  extend BakedFileSystem
+
+  # Include only source files, but exclude test files
+  bake_folder "./src",
+    include_patterns: ["**/*.cr", "**/*.md"],
+    exclude_patterns: ["**/test/*", "**/*_spec.cr"]
+end
+```
+
+**Important Notes:**
+- Patterns are relative to the baked directory (not absolute paths)
+- Include patterns are applied first (OR logic - match any pattern)
+- Exclude patterns are then applied (OR logic - exclude if matches any pattern)
+- Empty results raise error unless `allow_empty: true`
+
+**Use Cases:**
+- Embed only production assets (exclude dev/test files)
+- Include specific file types (source code, documentation)
+- Exclude large or generated files (builds, logs, cache)
+- Filter by directory structure (exclude vendor, node_modules)
 
 ### Loading Files
 
@@ -126,7 +190,7 @@ crystal build your_app.cr
 - **Keep total embedded size under 50 MB** for reasonable binary sizes
 - **Use runtime loading for very large assets** (> 10 MB per file)
 - **Review compilation statistics** to catch accidentally embedded files
-- **Use `.gitignore`-style patterns** (future feature) to exclude build artifacts
+- **Use file filtering patterns** to exclude build artifacts, tests, and development files
 - **Monitor benchmark results** to understand compile time and binary size impact
 
 ### Advanced
