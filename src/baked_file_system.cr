@@ -6,7 +6,7 @@ require "./baked_file_system/*"
 # binary and make them accessible at runtime using their path.
 #
 # ## Usage
-# ```crystal
+# ```
 # # Using BakedFileSystem.load
 # class MyFileSystem
 #   extend BakedFileSystem
@@ -70,7 +70,7 @@ module BakedFileSystem
   #
   # # Usage
   #
-  # ```crystal
+  # ```
   # file = MyFileSystem.get("hello-world.txt")
   # file.path        # => "hello-world.txt"
   # file.size        # => 12
@@ -299,8 +299,8 @@ module BakedFileSystem
     @@files = [] of BakedFileSystem::BakedFile
     @@paths = Set(String).new
 
-    macro bake_folder(path, dir = __DIR__, allow_empty = false, include_dotfiles = false, max_size = nil)
-      BakedFileSystem.bake_folder(\{{ path }}, \{{ dir }}, \{{ allow_empty }}, \{{ include_dotfiles }}, \{{ max_size }})
+    macro bake_folder(path, dir = __DIR__, allow_empty = false, include_dotfiles = false, include_patterns = nil, exclude_patterns = nil, max_size = nil)
+      BakedFileSystem.bake_folder(\{{ path }}, \{{ dir }}, \{{ allow_empty }}, \{{ include_dotfiles }}, \{{ include_patterns }}, \{{ exclude_patterns }}, \{{ max_size }})
     end
 
     def self.add_baked_file(file : BakedFileSystem::BakedFile)
@@ -333,13 +333,35 @@ module BakedFileSystem
   # Bakes all files in *path* into this baked file system.
   # If *path* is relative, it will be based on *dir* which defaults to `__DIR__`.
   # It will raise if there are no files found in *path* unless *allow_empty* is set to `true`.
+  # The *include_patterns* parameter accepts an array of glob patterns to include specific files.
+  # The *exclude_patterns* parameter accepts an array of glob patterns to exclude specific files.
   # The *max_size* parameter can be used to enforce a maximum total compressed size limit (in bytes).
-  macro bake_folder(path, dir = __DIR__, allow_empty = false, include_dotfiles = false, max_size = nil)
+  macro bake_folder(path, dir = __DIR__, allow_empty = false, include_dotfiles = false, include_patterns = nil, exclude_patterns = nil, max_size = nil)
     {% raise "BakedFileSystem.load expects `path` to be a StringLiteral." unless path.is_a?(StringLiteral) %}
 
     %files_size_ante = @@files.size
 
-    {{ run("./loader", path, dir, include_dotfiles, max_size || "nil") }}
+    # Serialize filter patterns as JSON for passing to loader process
+    {% if include_patterns || exclude_patterns %}
+      # Build JSON string manually at compile time
+      {% json_parts = [] of String %}
+      {% if include_patterns %}
+        {% include_json = "\"include\":[" + include_patterns.map { |p| "\"" + p + "\"" }.join(",") + "]" %}
+        {% json_parts << include_json %}
+      {% else %}
+        {% json_parts << "\"include\":null" %}
+      {% end %}
+      {% if exclude_patterns %}
+        {% exclude_json = "\"exclude\":[" + exclude_patterns.map { |p| "\"" + p + "\"" }.join(",") + "]" %}
+        {% json_parts << exclude_json %}
+      {% else %}
+        {% json_parts << "\"exclude\":null" %}
+      {% end %}
+      {% filter_json = "{" + json_parts.join(",") + "}" %}
+      {{ run("./loader", path, dir, include_dotfiles, filter_json, max_size || "nil") }}
+    {% else %}
+      {{ run("./loader", path, dir, include_dotfiles, "nil", max_size || "nil") }}
+    {% end %}
 
     {% unless allow_empty %}
     raise "BakedFileSystem empty: no files in #{File.expand_path({{ path }}, {{ dir }})}" if @@files.size - %files_size_ante == 0

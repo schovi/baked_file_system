@@ -124,7 +124,7 @@ describe BakedFileSystem::Loader do
       stdout = IO::Memory.new
 
       # Should complete successfully with a large max_size
-      BakedFileSystem::Loader.load(stdout, File.expand_path(File.join(__DIR__, "storage")), false, 10_000_000_i64)
+      BakedFileSystem::Loader.load(stdout, File.expand_path(File.join(__DIR__, "storage")), false, nil, nil, 10_000_000_i64)
 
       # Should generate code for the files
       stdout.to_s.should contain("BakedFile.new")
@@ -234,7 +234,7 @@ describe BakedFileSystem::Loader::Stats do
       stats.add_file("/file.txt", 1000_i64, 500_i64)
 
       io = IO::Memory.new
-      stats.report_to(io, 1000_i64)  # Should not raise
+      stats.report_to(io, 1000_i64) # Should not raise
 
       output = io.to_s
       output.should contain("BakedFileSystem: Embedded 1 file")
@@ -289,5 +289,176 @@ describe BakedFileSystem::Loader::ByteCounter do
     counter.count.should eq(11)
 
     io.to_s.should eq("hello world")
+  end
+end
+
+describe "BakedFileSystem::Loader file filtering" do
+  describe ".filter_files" do
+    it "returns all files when no patterns provided" do
+      files = ["src/main.cr", "src/lib.cr", "test/spec.cr"]
+      result = BakedFileSystem::Loader.filter_files(files, nil, nil)
+      result.should eq(files)
+    end
+
+    it "filters by include patterns only" do
+      files = ["src/main.cr", "src/lib.cr", "test/spec.cr", "README.md"]
+      include_patterns = ["**/*.cr"]
+      result = BakedFileSystem::Loader.filter_files(files, include_patterns, nil)
+      result.should eq(["src/main.cr", "src/lib.cr", "test/spec.cr"])
+    end
+
+    it "filters by exclude patterns only" do
+      files = ["src/main.cr", "src/lib.cr", "test/spec.cr", "README.md"]
+      exclude_patterns = ["**/test/*"]
+      result = BakedFileSystem::Loader.filter_files(files, nil, exclude_patterns)
+      result.should eq(["src/main.cr", "src/lib.cr", "README.md"])
+    end
+
+    it "applies include then exclude patterns" do
+      files = ["src/main.cr", "src/test_helper.cr", "test/spec.cr", "README.md"]
+      include_patterns = ["**/*.cr"]
+      exclude_patterns = ["**/test/*", "**/*test*.cr"]
+      result = BakedFileSystem::Loader.filter_files(files, include_patterns, exclude_patterns)
+      result.should eq(["src/main.cr"])
+    end
+
+    it "handles multiple include patterns (OR logic)" do
+      files = ["src/main.cr", "docs/guide.md", "README.txt", "config.yml"]
+      include_patterns = ["**/*.cr", "**/*.md"]
+      result = BakedFileSystem::Loader.filter_files(files, include_patterns, nil)
+      result.should eq(["src/main.cr", "docs/guide.md"])
+    end
+
+    it "handles multiple exclude patterns (OR logic)" do
+      files = ["src/main.cr", "test/spec.cr", "docs/README.md", "build/output.txt"]
+      exclude_patterns = ["**/test/*", "**/build/*"]
+      result = BakedFileSystem::Loader.filter_files(files, nil, exclude_patterns)
+      result.should eq(["src/main.cr", "docs/README.md"])
+    end
+
+    it "returns empty array when all files filtered out" do
+      files = ["test/unit.cr", "test/integration.cr"]
+      exclude_patterns = ["**/test/*"]
+      result = BakedFileSystem::Loader.filter_files(files, nil, exclude_patterns)
+      result.should be_empty
+    end
+
+    it "handles empty file list" do
+      files = [] of String
+      include_patterns = ["**/*.cr"]
+      result = BakedFileSystem::Loader.filter_files(files, include_patterns, nil)
+      result.should be_empty
+    end
+
+    it "handles empty pattern arrays" do
+      files = ["src/main.cr"]
+      result = BakedFileSystem::Loader.filter_files(files, [] of String, [] of String)
+      result.should eq(files)
+    end
+  end
+end
+
+describe "BakedFileSystem::Loader pattern matching" do
+  describe ".matches_pattern?" do
+    describe "with * wildcard" do
+      it "matches any characters except path separator" do
+        BakedFileSystem::Loader.matches_pattern?("file.txt", "*.txt").should be_true
+        BakedFileSystem::Loader.matches_pattern?("test.txt", "*.txt").should be_true
+        BakedFileSystem::Loader.matches_pattern?("file.cr", "*.txt").should be_false
+      end
+
+      it "matches multiple wildcards" do
+        BakedFileSystem::Loader.matches_pattern?("test.spec.cr", "*.spec.*").should be_true
+        BakedFileSystem::Loader.matches_pattern?("test.cr", "*.spec.*").should be_false
+      end
+
+      it "does not match across path separators" do
+        BakedFileSystem::Loader.matches_pattern?("src/file.txt", "*.txt").should be_false
+        BakedFileSystem::Loader.matches_pattern?("src/file.txt", "src/*.txt").should be_true
+      end
+    end
+
+    describe "with ** recursive wildcard" do
+      it "matches files in any subdirectory" do
+        BakedFileSystem::Loader.matches_pattern?("file.cr", "**/*.cr").should be_true
+        BakedFileSystem::Loader.matches_pattern?("src/file.cr", "**/*.cr").should be_true
+        BakedFileSystem::Loader.matches_pattern?("src/models/user.cr", "**/*.cr").should be_true
+        BakedFileSystem::Loader.matches_pattern?("file.txt", "**/*.cr").should be_false
+      end
+
+      it "matches files in specific subdirectories recursively" do
+        # **/test/* means: any depth, then "test/", then any file name (no subdirs under test)
+        BakedFileSystem::Loader.matches_pattern?("test/spec.cr", "**/test/*").should be_true
+        BakedFileSystem::Loader.matches_pattern?("src/test/helper.cr", "**/test/*").should be_true
+        BakedFileSystem::Loader.matches_pattern?("spec/unit.cr", "**/test/*").should be_false
+        # For files in subdirectories of test/, use **/test/**
+        BakedFileSystem::Loader.matches_pattern?("test/unit/spec.cr", "**/test/**").should be_true
+      end
+
+      it "handles ** at start of pattern" do
+        BakedFileSystem::Loader.matches_pattern?("src/file.cr", "**/src/file.cr").should be_true
+        BakedFileSystem::Loader.matches_pattern?("lib/src/file.cr", "**/src/file.cr").should be_true
+        BakedFileSystem::Loader.matches_pattern?("file.cr", "**/file.cr").should be_true
+      end
+
+      it "handles ** at end of pattern" do
+        BakedFileSystem::Loader.matches_pattern?("test/file.cr", "test/**").should be_true
+        BakedFileSystem::Loader.matches_pattern?("test/unit/file.cr", "test/**").should be_true
+        BakedFileSystem::Loader.matches_pattern?("spec/file.cr", "test/**").should be_false
+      end
+    end
+
+    describe "with ? wildcard" do
+      it "matches single character" do
+        BakedFileSystem::Loader.matches_pattern?("file1.txt", "file?.txt").should be_true
+        BakedFileSystem::Loader.matches_pattern?("fileA.txt", "file?.txt").should be_true
+        BakedFileSystem::Loader.matches_pattern?("file12.txt", "file?.txt").should be_false
+        BakedFileSystem::Loader.matches_pattern?("file.txt", "file?.txt").should be_false
+      end
+
+      it "matches multiple single characters" do
+        BakedFileSystem::Loader.matches_pattern?("test_01.cr", "test_??.cr").should be_true
+        BakedFileSystem::Loader.matches_pattern?("test_1.cr", "test_??.cr").should be_false
+      end
+    end
+
+    describe "edge cases" do
+      it "handles leading slashes consistently" do
+        BakedFileSystem::Loader.matches_pattern?("/file.txt", "*.txt").should be_true
+        BakedFileSystem::Loader.matches_pattern?("file.txt", "*.txt").should be_true
+        BakedFileSystem::Loader.matches_pattern?("/src/file.txt", "src/*.txt").should be_true
+        BakedFileSystem::Loader.matches_pattern?("src/file.txt", "src/*.txt").should be_true
+      end
+
+      it "normalizes backslashes to forward slashes" do
+        BakedFileSystem::Loader.matches_pattern?("src\\file.txt", "src/*.txt").should be_true
+        BakedFileSystem::Loader.matches_pattern?("src/file.txt", "src\\*.txt").should be_true
+      end
+
+      it "handles exact matches" do
+        BakedFileSystem::Loader.matches_pattern?("exact.txt", "exact.txt").should be_true
+        BakedFileSystem::Loader.matches_pattern?("other.txt", "exact.txt").should be_false
+      end
+
+      it "handles empty components correctly" do
+        BakedFileSystem::Loader.matches_pattern?("file.txt", "**/*.txt").should be_true
+      end
+    end
+
+    describe "complex patterns" do
+      it "combines multiple wildcards" do
+        BakedFileSystem::Loader.matches_pattern?("src/models/user_model.cr", "**/models/*.cr").should be_true
+        BakedFileSystem::Loader.matches_pattern?("lib/src/models/base.cr", "**/models/*.cr").should be_true
+        BakedFileSystem::Loader.matches_pattern?("src/controllers/user.cr", "**/models/*.cr").should be_false
+      end
+
+      it "matches typical exclusion patterns" do
+        BakedFileSystem::Loader.matches_pattern?("spec/unit_spec.cr", "**/spec/*").should be_true
+        BakedFileSystem::Loader.matches_pattern?("test/test.cr", "**/test/*").should be_true
+        BakedFileSystem::Loader.matches_pattern?("src/main.cr", "**/test/*").should be_false
+        # For deep paths under test/, use **
+        BakedFileSystem::Loader.matches_pattern?("test/integration/test.cr", "**/test/**").should be_true
+      end
+    end
   end
 end

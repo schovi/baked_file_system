@@ -43,6 +43,37 @@ class EdgeCaseStorage
   bake_folder "./storage_edge_cases"
 end
 
+# Test storage with include patterns - only .cr files
+class FilteredStorageInclude
+  extend BakedFileSystem
+  bake_folder "./storage/filters", include_patterns: ["**/*.cr"]
+end
+
+# Test storage with exclude patterns - exclude test directory
+class FilteredStorageExclude
+  extend BakedFileSystem
+  bake_folder "./storage/filters", exclude_patterns: ["**/test/*"]
+end
+
+# Test storage with both include and exclude patterns
+class FilteredStorageCombined
+  extend BakedFileSystem
+  bake_folder "./storage/filters", include_patterns: ["**/*.cr", "**/*.md"], exclude_patterns: ["**/test/*"]
+end
+
+# Test storage with patterns that result in empty set (unless allow_empty)
+class FilteredStorageEmpty
+  extend BakedFileSystem
+  bake_folder "./storage/filters", include_patterns: ["**/*.txt"], allow_empty: true
+end
+
+# This should raise an error at compile time - patterns match nothing and allow_empty is false
+# Commented out because it would prevent compilation
+# class FilteredStorageEmptyError
+#   extend BakedFileSystem
+#   bake_folder "./storage/filters", include_patterns: ["**/*.txt"]
+# end
+
 def read_slice(path)
   File.open(path, "rb") do |io|
     Slice(UInt8).new(io.size).tap do |buf|
@@ -53,7 +84,7 @@ end
 
 describe BakedFileSystem do
   it "load only files without hidden one" do
-    Storage.files.size.should eq(4)
+    Storage.files.size.should eq(10) # lorem.txt, images/sidekiq.png, string_encoding/*, filters/*
     Storage.get?(".hidden/hidden_file.txt").should be_nil
   end
 
@@ -115,7 +146,7 @@ describe BakedFileSystem do
   end
 
   it "handles interpolation in content" do
-    String.new(Storage.get("string_encoding/interpolation.gz").to_slice).should eq "\#{foo} \{% macro %}\n"
+    String.new(Storage.get("string_encoding/interpolation.gz").to_slice).should eq "\#{foo} {% macro %}\n"
   end
 
   describe "rewind functionality" do
@@ -578,6 +609,65 @@ describe BakedFileSystem do
       end
 
       file.not_nil!.closed?.should be_true
+    end
+  end
+
+  describe "file filtering" do
+    it "includes only files matching include patterns" do
+      # Should only have .cr files
+      FilteredStorageInclude.files.size.should eq(4) # src/main.cr, src/lib.cr, test/spec.cr, test/helper.cr
+      FilteredStorageInclude.get?("src/main.cr").should_not be_nil
+      FilteredStorageInclude.get?("src/lib.cr").should_not be_nil
+      FilteredStorageInclude.get?("test/spec.cr").should_not be_nil
+      FilteredStorageInclude.get?("test/helper.cr").should_not be_nil
+      FilteredStorageInclude.get?("docs/README.md").should be_nil
+      FilteredStorageInclude.get?("config.yml").should be_nil
+    end
+
+    it "excludes files matching exclude patterns" do
+      # Should have everything except test/* files
+      FilteredStorageExclude.files.size.should eq(4) # src/*, docs/*, config.yml
+      FilteredStorageExclude.get?("src/main.cr").should_not be_nil
+      FilteredStorageExclude.get?("src/lib.cr").should_not be_nil
+      FilteredStorageExclude.get?("docs/README.md").should_not be_nil
+      FilteredStorageExclude.get?("config.yml").should_not be_nil
+      FilteredStorageExclude.get?("test/spec.cr").should be_nil
+      FilteredStorageExclude.get?("test/helper.cr").should be_nil
+    end
+
+    it "applies both include and exclude patterns" do
+      # Include *.cr and *.md, exclude test/*
+      # Should have: src/*.cr and docs/*.md (not test/*.cr)
+      FilteredStorageCombined.files.size.should eq(3) # src/main.cr, src/lib.cr, docs/README.md
+      FilteredStorageCombined.get?("src/main.cr").should_not be_nil
+      FilteredStorageCombined.get?("src/lib.cr").should_not be_nil
+      FilteredStorageCombined.get?("docs/README.md").should_not be_nil
+      FilteredStorageCombined.get?("test/spec.cr").should be_nil
+      FilteredStorageCombined.get?("test/helper.cr").should be_nil
+      FilteredStorageCombined.get?("config.yml").should be_nil
+    end
+
+    it "handles empty result with allow_empty" do
+      # No .txt files in filters directory, but allow_empty is true
+      FilteredStorageEmpty.files.size.should eq(0)
+    end
+
+    it "filters are relative to baked directory" do
+      # Patterns should match from the baked folder root, not absolute paths
+      FilteredStorageInclude.get?("src/main.cr").should_not be_nil
+      # Not "/storage/filters/src/main.cr"
+    end
+
+    it "can read content from filtered files" do
+      file = FilteredStorageInclude.get("src/main.cr")
+      content = file.gets_to_end
+      content.should contain("Main file")
+    end
+
+    it "empty result behavior respects allow_empty flag" do
+      # FilteredStorageEmpty has allow_empty: true, so it should work with 0 files
+      FilteredStorageEmpty.files.size.should eq(0)
+      # Without allow_empty: true, it would raise at compile time (tested manually)
     end
   end
 end
