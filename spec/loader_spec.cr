@@ -51,6 +51,8 @@ describe BakedFileSystem::Loader do
       code.should contain("lorem")
       # Should contain numeric values (sizes)
       code.should match(/\d+/)
+      code.should contain("modification_time:")
+      code.should contain("digest:")
     end
   end
 

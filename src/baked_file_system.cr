@@ -1,6 +1,6 @@
 require "base64"
 require "compress/gzip"
-require "./baked_file_system/*"
+require "./baked_file_system/version"
 
 # A `BakedFileSystem` allows to include ("bake") static files into a compiled
 # binary and make them accessible at runtime using their path.
@@ -84,12 +84,18 @@ module BakedFileSystem
     # Returns the size of this virtual file.
     getter size : Int32
 
+    # Returns the source file modification time if this file was baked from disk.
+    getter modification_time : Time?
+
+    # Returns the SHA-256 digest of the source file if this file was baked from disk.
+    getter digest : String?
+
     # Returns whether this file is compressed. If not, it is decompressed on read.
     getter? compressed : Bool
 
     @closed : Bool = false
 
-    def initialize(@path, @size, @compressed, @slice : Bytes)
+    def initialize(@path, @size, @compressed, @slice : Bytes, @modification_time : Time? = nil, @digest : String? = nil)
       @path = "/" + @path unless @path.starts_with? '/'
       @memory_io = IO::Memory.new(@slice)
       @wrapped_io = compressed? ? @memory_io : Compress::Gzip::Reader.new(@memory_io)
@@ -184,6 +190,16 @@ module BakedFileSystem
       @slice
     end
 
+    # Returns the raw bytes stored in the binary.
+    def raw : Bytes
+      @slice
+    end
+
+    # Returns a fresh IO over the raw bytes stored in the binary.
+    def raw_io : IO
+      IO::Memory.new(@slice)
+    end
+
     # Return the data for this file as a String.
     #
     # DEPRECATED: `BakedFile` can be used as an IO directly. Use `gets_to_end` instead
@@ -268,7 +284,7 @@ module BakedFileSystem
     return nil unless template
 
     # Create a new instance to ensure thread safety and independent state
-    BakedFile.new(template.path, template.size, template.compressed?, template.to_slice)
+    BakedFile.new(template.path, template.size, template.compressed?, template.to_slice, template.modification_time, template.digest)
   end
 
   # Opens a file and yields it to the block, ensuring it's closed afterwards.

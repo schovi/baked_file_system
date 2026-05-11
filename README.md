@@ -117,6 +117,30 @@ Assets.files.each do |file|
 end
 ```
 
+### Serving Files over HTTP
+
+Use `BakedFileSystem::HTTP::StaticFileHandler` to serve baked assets from an `HTTP::Server`.
+
+```crystal
+require "baked_file_system"
+require "baked_file_system/http"
+
+class Assets
+  extend BakedFileSystem
+
+  bake_folder "./public"
+end
+
+server = HTTP::Server.new([
+  BakedFileSystem::HTTP::StaticFileHandler.new(Assets, prefix: "/assets"),
+])
+
+server.bind_tcp "127.0.0.1", 8080
+server.listen
+```
+
+The handler supports `GET` and `HEAD`, MIME types, directory redirects and listings, `index.html`, byte ranges, cache validators, and gzip pass-through when the request accepts gzip.
+
 ### File Properties
 
 ```crystal
@@ -126,6 +150,9 @@ file.path          # => "/document.pdf"
 file.size          # => 10240 (original uncompressed size)
 file.compressed?   # => true (all files are automatically compressed)
 file.compressed_size # => 3120 (actual stored size in binary)
+file.digest        # => SHA-256 digest for files baked from disk
+file.raw           # => Slice(UInt8) with the bytes stored in the binary
+file.raw_io        # => IO over the bytes stored in the binary
 ```
 
 ### Compression
