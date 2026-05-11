@@ -31,7 +31,7 @@ module BakedFileSystem
       def report_to(io : IO, max_size_override : Int64? = nil)
         effective_max_size = max_size_override || @max_size
 
-        io.puts "BakedFileSystem: Embedded #{file_count} file#{"s" if file_count != 1} (#{human_size(total_uncompressed)} → #{human_size(total_compressed)} compressed, #{compression_ratio}% ratio)"
+        io.puts "BakedFileSystem: Embedded #{file_count} file#{"s" if file_count != 1} (#{human_size(total_uncompressed)} → #{human_size(total_compressed)} stored, #{compression_ratio}% ratio)"
 
         if large_files.any?
           io.puts ""
@@ -48,7 +48,7 @@ module BakedFileSystem
 
         if total_compressed > effective_max_size
           io.puts ""
-          io.puts "❌  ERROR: Total embedded size (#{human_size(total_compressed)}) exceeds limit (#{human_size(effective_max_size)})"
+          io.puts "❌  ERROR: Total stored size (#{human_size(total_compressed)}) exceeds limit (#{human_size(effective_max_size)})"
           io.puts "    Reduce the number/size of embedded files or increase the limit."
           raise SizeExceededError.new("Total size #{human_size(total_compressed)} exceeds limit #{human_size(effective_max_size)}")
         end

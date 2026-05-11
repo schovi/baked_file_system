@@ -30,12 +30,13 @@ end
 ```
 
 **Options:**
-- `bake_folder(path, dir = __DIR__, allow_empty: false, include_dotfiles: false, include_patterns: nil, exclude_patterns: nil, max_size: nil)` - Bake all files in a directory
+- `bake_folder(path, dir = __DIR__, allow_empty: false, include_dotfiles: false, include_patterns: nil, exclude_patterns: nil, max_size: nil, compress: true)` - Bake all files in a directory
 - `include_dotfiles: true` - Include files/folders starting with `.` (e.g., `.gitignore`)
 - `allow_empty: false` - Raise error if folder is empty
 - `include_patterns: Array(String)` - Include only files matching glob patterns
 - `exclude_patterns: Array(String)` - Exclude files matching glob patterns
-- `max_size: Int64` - Maximum total compressed size in bytes (compilation fails if exceeded)
+- `max_size: Int64` - Maximum total stored size in bytes (compilation fails if exceeded)
+- `compress: false` - Store files as-is instead of gzip-compressing them at compile time
 
 ### File Filtering
 
@@ -124,28 +125,35 @@ file = Assets.get("document.pdf")
 
 file.path          # => "/document.pdf"
 file.size          # => 10240 (original uncompressed size)
-file.compressed?   # => true (all files are automatically compressed)
-file.compressed_size # => 3120 (actual stored size in binary)
+file.compressed?   # => false (true for files such as .gz that are already compressed content)
+file.stored_compressed? # => true (embedded bytes are gzip-compressed for storage)
+file.compressed_size # => 3120 (stored size in binary)
 ```
 
 ### Compression
 
 Files are automatically gzip-compressed at compile time to reduce binary size. This is transparent - reading a file automatically decompresses it.
 
-**Special case:** Files ending in `.gz` are stored compressed as-is (no double compression).
+Set `compress: false` when read performance is more important than binary size:
 
 ```crystal
-# Both work the same - automatic decompression on read
-Assets.get("file.txt").gets_to_end
-Assets.get("file.txt.gz").gets_to_end
+class Assets
+  extend BakedFileSystem
+
+  bake_folder "./public", compress: false
+end
 ```
+
+With compression disabled, `compressed_size` reports the same value as `size`, and `to_slice` returns the original file bytes.
+
+**Special case:** Files ending in `.gz` are stored and read as-is (no double compression).
 
 ### Size Management & Limits
 
 BakedFileSystem automatically reports compilation statistics to help you monitor binary size impact:
 
 ```
-BakedFileSystem: Embedded 42 files (2.3 MB → 890.0 KB compressed, 38.7% ratio)
+BakedFileSystem: Embedded 42 files (2.3 MB → 890.0 KB stored, 38.7% ratio)
 ```
 
 #### Compilation Warnings
@@ -166,7 +174,7 @@ Enforce maximum size limits per folder:
 class Assets
   extend BakedFileSystem
 
-  # Compilation will fail if compressed size exceeds 10 MB
+  # Compilation will fail if stored size exceeds 10 MB
   bake_folder "./images", max_size: 10_485_760  # 10 MB in bytes
 end
 ```

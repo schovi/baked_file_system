@@ -117,6 +117,25 @@ describe BakedFileSystem::Loader do
       code.should contain("path:")
       code.should contain("size:")
     end
+
+    it "generates raw file entries when compression is disabled" do
+      test_path = File.expand_path(File.join(__DIR__, "loader_uncompressed_test"))
+      Dir.mkdir_p(test_path)
+      File.write(File.join(test_path, "plain.txt"), "plain text")
+
+      begin
+        output = IO::Memory.new
+        BakedFileSystem::Loader.load(output, test_path, compress: false)
+
+        code = output.to_s
+        code.should contain("compressed:      false")
+        code.should contain("stored_compressed: false")
+        code.should contain("plain text")
+      ensure
+        File.delete(File.join(test_path, "plain.txt")) if File.exists?(File.join(test_path, "plain.txt"))
+        Dir.delete(test_path) if Dir.exists?(test_path)
+      end
+    end
   end
 
   describe "size tracking and reporting" do
@@ -223,7 +242,7 @@ describe BakedFileSystem::Loader::Stats do
 
       io = IO::Memory.new
 
-      # Should raise when compressed size exceeds max_size
+      # Should raise when stored size exceeds max_size
       expect_raises(BakedFileSystem::Loader::Stats::SizeExceededError) do
         stats.report_to(io, 100_i64)
       end

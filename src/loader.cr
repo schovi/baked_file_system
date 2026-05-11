@@ -26,5 +26,6 @@ if ARGV[3]? && ARGV[3] != "nil"
 end
 
 max_size = ARGV[4]? && ARGV[4] != "nil" ? ARGV[4].to_i64 : nil
+compress = ARGV[5]? != "false"
 
-BakedFileSystem::Loader.load(STDOUT, path, include_dotfiles, include_patterns, exclude_patterns, max_size)
+BakedFileSystem::Loader.load(STDOUT, path, include_dotfiles, include_patterns, exclude_patterns, max_size, compress)
