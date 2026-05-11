@@ -81,7 +81,7 @@ module BakedFileSystem
       result
     end
 
-    def self.load(io, root_path, include_dotfiles = false, include_patterns : Array(String)? = nil, exclude_patterns : Array(String)? = nil, max_size : Int64? = nil)
+    def self.load(io, root_path, include_dotfiles = false, include_patterns : Array(String)? = nil, exclude_patterns : Array(String)? = nil, max_size : Int64? = nil, compress = true)
       if !File.exists?(root_path)
         raise Error.new "path does not exist: #{root_path}"
       elsif !File.directory?(root_path)
@@ -122,29 +122,32 @@ module BakedFileSystem
         io << "  path:            " << relative_path.dump << ",\n"
         io << "  size:            " << uncompressed_size << ",\n"
         compressed = path.ends_with?("gz")
+        stored_compressed = compress && !compressed
 
         io << "  compressed:      " << compressed << ",\n"
-
-        byte_counter = ByteCounter.new(io)
+        io << "  stored_compressed: " << stored_compressed << ",\n"
 
         File.open(path, "rb") do |file|
           io << "  slice:         \""
+          stored_size = 0_i64
 
-          StringEncoder.open(byte_counter) do |encoder|
-            if compressed
-              IO.copy file, encoder
-            else
-              Compress::Gzip::Writer.open(encoder) do |writer|
+          StringEncoder.open(io) do |encoder|
+            stored_byte_counter = ByteCounter.new(encoder)
+
+            if stored_compressed
+              Compress::Gzip::Writer.open(stored_byte_counter) do |writer|
                 IO.copy file, writer
               end
+            else
+              IO.copy file, stored_byte_counter
             end
 
-            io << "\".to_slice,\n"
+            stored_size = stored_byte_counter.count
           end
-        end
 
-        compressed_size = byte_counter.count
-        stats.add_file(relative_path, uncompressed_size, compressed_size)
+          io << "\".to_slice,\n"
+          stats.add_file(relative_path, uncompressed_size, stored_size)
+        end
 
         io << ")\n"
         io << "\n"
