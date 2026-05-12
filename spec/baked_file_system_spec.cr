@@ -417,6 +417,7 @@ describe BakedFileSystem do
       original_path = File.expand_path(File.join(__DIR__, "storage", path))
 
       file.compressed?.should be_false
+      file.stored_compressed?.should be_false
       file.compressed_size.should eq(file.size)
       file.to_slice.should eq(read_slice(original_path))
       file.gets_to_end.should eq(File.read(original_path))
