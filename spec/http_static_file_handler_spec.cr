@@ -14,6 +14,11 @@ class HTTPIndexStorage
   bake_file "index.html", "Home\n"
 end
 
+class HTTPCustomStorage
+  extend BakedFileSystem
+  bake_file BakedFileSystem::BakedFile.new("raw.txt", 10, false, "Raw body\n!".to_slice, false)
+end
+
 def call_static_handler(
   handler,
   method = "GET",
@@ -128,6 +133,16 @@ describe BakedFileSystem::HTTP::StaticFileHandler do
     response.headers["Content-Range"].should eq("bytes */#{HTTPStorage.get("lorem.txt").size}")
   end
 
+  it "ignores unknown range units and serves the full response" do
+    response = call_static_handler(
+      BakedFileSystem::HTTP::StaticFileHandler.new(HTTPStorage),
+      headers: HTTP::Headers{"Range" => "items=0-4"}
+    )
+
+    response.status_code.should eq(200)
+    response.body.should eq(HTTPStorage.get("lorem.txt").gets_to_end)
+  end
+
   it "serves multipart byte ranges" do
     response = call_static_handler(
       BakedFileSystem::HTTP::StaticFileHandler.new(HTTPStorage),
@@ -138,6 +153,17 @@ describe BakedFileSystem::HTTP::StaticFileHandler do
     response.headers["Content-Type"].should start_with("multipart/byteranges")
     response.body.should contain("Content-Range: bytes 0-4/#{HTTPStorage.get("lorem.txt").size}")
     response.body.should contain("Content-Range: bytes 6-10/#{HTTPStorage.get("lorem.txt").size}")
+  end
+
+  it "serves custom uncompressed files after computing fallback etags" do
+    response = call_static_handler(
+      BakedFileSystem::HTTP::StaticFileHandler.new(HTTPCustomStorage),
+      resource: "/raw.txt"
+    )
+
+    response.status_code.should eq(200)
+    response.headers["ETag"].should_not be_empty
+    response.body.should eq("Raw body\n!")
   end
 
   it "returns not modified for matching etags" do

@@ -1,4 +1,5 @@
 require "base64"
+require "compress/gzip"
 require "digest/sha256"
 require "html"
 require "http/server/handler"
@@ -18,15 +19,32 @@ class BakedFileSystem::HTTP::StaticFileHandler
     size : Int64,
     gzip_encoded : Bool do
     def bytes : Bytes
-      gzip_encoded ? file.raw : file.to_slice(false)
+      if gzip_encoded || !file.stored_compressed?
+        file.raw
+      else
+        io = IO::Memory.new
+        gzip = Compress::Gzip::Reader.new(file.raw_io)
+        begin
+          IO.copy(gzip, io)
+        ensure
+          gzip.close
+        end
+        io.to_slice
+      end
     end
 
     def io : IO
-      gzip_encoded ? file.raw_io : file
+      if gzip_encoded || !file.stored_compressed?
+        file.raw_io
+      else
+        Compress::Gzip::Reader.new(file.raw_io)
+      end
     end
   end
 
   @prefix : String
+  @directories : Set(String)
+  @directory_entries : Hash(String, Array(DirectoryEntry))
 
   def initialize(
     @filesystem : BakedFileSystem,
@@ -36,6 +54,7 @@ class BakedFileSystem::HTTP::StaticFileHandler
     @index_file : String? = "index.html",
   )
     @prefix = normalize_prefix(prefix)
+    @directories, @directory_entries = build_directory_index(@filesystem.files)
   end
 
   def call(context) : Nil
@@ -137,7 +156,9 @@ class BakedFileSystem::HTTP::StaticFileHandler
     context.response.headers["Accept-Ranges"] = "bytes"
     context.response.headers["ETag"] = etag(representation)
     context.response.headers["Content-Encoding"] = "gzip" if representation.gzip_encoded
-    context.response.headers.add("Vary", "Accept-Encoding") unless representation.file.compressed?
+    if representation.file.stored_compressed? && !representation.file.compressed?
+      context.response.headers.add("Vary", "Accept-Encoding")
+    end
 
     if modification_time = representation.file.modification_time
       context.response.headers["Last-Modified"] = ::HTTP.format_time(modification_time)
@@ -153,7 +174,7 @@ class BakedFileSystem::HTTP::StaticFileHandler
   private def serve_range(context : ::HTTP::Server::Context, representation : Representation, range_header : String) : Nil
     range_header = range_header.lchop?("bytes=")
     unless range_header
-      return range_not_satisfiable(context, representation.size)
+      return serve_full(context, representation)
     end
 
     ranges = parse_ranges(range_header, representation.size)
@@ -287,7 +308,7 @@ class BakedFileSystem::HTTP::StaticFileHandler
 
   private def digest(representation : Representation) : String
     return Digest::SHA256.hexdigest(representation.file.raw) if representation.gzip_encoded
-    return Digest::SHA256.hexdigest(representation.file.raw) if representation.file.compressed?
+    return Digest::SHA256.hexdigest(representation.file.raw) unless representation.file.stored_compressed?
 
     representation.file.digest || Digest::SHA256.hexdigest(representation.bytes)
   end
@@ -297,8 +318,7 @@ class BakedFileSystem::HTTP::StaticFileHandler
   end
 
   private def directory?(path : String) : Bool
-    directory_prefix = path.ends_with?("/") ? path : "#{path}/"
-    @filesystem.files.any? { |file| file.path.starts_with?(directory_prefix) }
+    @directories.includes?(directory_path(path))
   end
 
   private def index_file_for(path : String) : BakedFileSystem::BakedFile?
@@ -339,20 +359,41 @@ class BakedFileSystem::HTTP::StaticFileHandler
   end
 
   private def directory_entries(path : String) : Array(DirectoryEntry)
-    prefix = path == "/" ? "/" : (path.ends_with?("/") ? path : "#{path}/")
-    entries = {} of String => Bool
+    @directory_entries[directory_path(path)]? || [] of DirectoryEntry
+  end
 
-    @filesystem.files.each do |file|
-      next unless file.path.starts_with?(prefix)
-
-      remainder = file.path[prefix.size..]?
-      next if remainder.nil? || remainder.empty?
-
-      name, separator, _rest = remainder.partition("/")
-      entries[name] = entries.fetch(name, false) || !separator.empty?
+  private def build_directory_index(files : Array(BakedFileSystem::BakedFile)) : Tuple(Set(String), Hash(String, Array(DirectoryEntry)))
+    directories = Set(String).new
+    directories << "/"
+    entries_by_path = Hash(String, Hash(String, Bool)).new do |hash, key|
+      hash[key] = {} of String => Bool
     end
 
-    entries.map { |name, directory| DirectoryEntry.new(name, directory) }
-      .sort_by { |entry| {entry.directory ? 0 : 1, entry.name.downcase} }
+    files.each do |file|
+      parts = file.path.split('/').reject(&.empty?)
+      directory = "/"
+
+      parts.each_with_index do |part, index|
+        directory_entry = index < parts.size - 1
+        entries_by_path[directory][part] = entries_by_path[directory].fetch(part, false) || directory_entry
+
+        next unless directory_entry
+
+        directory = directory == "/" ? "/#{part}" : "#{directory}/#{part}"
+        directories << directory
+      end
+    end
+
+    directory_entries = {} of String => Array(DirectoryEntry)
+    entries_by_path.each do |path, entries|
+      directory_entries[path] = entries.map { |name, directory| DirectoryEntry.new(name, directory) }
+        .sort_by { |entry| {entry.directory ? 0 : 1, entry.name.downcase} }
+    end
+
+    {directories, directory_entries}
+  end
+
+  private def directory_path(path : String) : String
+    path == "/" ? "/" : path.rstrip('/')
   end
 end
