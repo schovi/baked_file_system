@@ -1,3 +1,3 @@
 module BakedFileSystem
-  VERSION = "0.12.0"
+  VERSION = "0.14.0"
 end

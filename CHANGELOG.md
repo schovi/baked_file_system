@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-05-12
+
+### Added
+- `BakedFileSystem::HTTP::StaticFileHandler` for serving baked assets directly from `HTTP::Server`
+- HTTP static serving support for `GET`, `HEAD`, MIME types, byte ranges, multipart ranges, cache validators, `index.html`, directory redirects, and optional directory listings
+- Gzip pass-through for HTTP clients that send `Accept-Encoding: gzip`, using the stored baked bytes without decompressing and recompressing
+- `BakedFile#raw` and `BakedFile#raw_io` for accessing the bytes stored in the binary
+- `BakedFile#stored_compressed?` to distinguish storage compression from source files that are already compressed content
+- `BakedFile#modification_time` and `BakedFile#digest` metadata for files baked from disk
+- `compress: false` option for `bake_folder` to store files as-is when read performance matters more than binary size
+
+### Changed
+- Loader size reporting and limits now consistently refer to stored byte size, whether or not storage compression is enabled
+- `.gz` source files continue to be stored and read as-is, while normal files can independently opt in or out of storage compression
+
+### Fixed
+- PNG fixtures are marked as binary so Git does not normalize embedded CRLF byte sequences during checkout
+
 ## [0.12.0] - 2025-11-03
 
 ### Added
@@ -79,6 +97,7 @@ This feature prevents accidental inclusion of huge files that bloat binary size.
 
 For changes in versions 0.9.x and earlier, see git history.
 
+[0.14.0]: https://github.com/schovi/baked_file_system/compare/v0.13.0...v0.14.0
 [0.12.0]: https://github.com/schovi/baked_file_system/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/schovi/baked_file_system/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/schovi/baked_file_system/compare/v0.9.8...v0.10.0
