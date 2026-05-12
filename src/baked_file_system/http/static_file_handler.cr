@@ -125,7 +125,7 @@ class BakedFileSystem::HTTP::StaticFileHandler
   end
 
   private def select_representation(context : ::HTTP::Server::Context, file : BakedFileSystem::BakedFile, path : String) : Representation
-    gzip_encoded = !file.compressed? && context.request.headers.includes_word?("Accept-Encoding", "gzip")
+    gzip_encoded = file.stored_compressed? && !file.compressed? && context.request.headers.includes_word?("Accept-Encoding", "gzip")
     size = gzip_encoded ? file.raw.bytesize.to_i64 : file.size.to_i64
     content_type = MIME.from_filename(path, "application/octet-stream")
 

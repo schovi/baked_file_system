@@ -44,15 +44,15 @@ module BakedFileSystem
   #
   # ## Architecture
   #
-  # Files are stored compressed in the binary's read-only data section as byte slices.
+  # Files are stored in the binary's read-only data section as byte slices.
   # On first access, BakedFile creates:
   #
-  # 1. **Memory IO**: Wraps the compressed byte slice
-  # 2. **Gzip Reader**: Wraps the memory IO for transparent decompression
-  # 3. **Wrapped IO**: Either the memory IO (for .gz files) or gzip reader
+  # 1. **Memory IO**: Wraps the embedded byte slice
+  # 2. **Gzip Reader**: Wraps the memory IO when storage compression is enabled
+  # 3. **Wrapped IO**: Either the memory IO or gzip reader
   #
   # This lazy-loading approach minimizes memory usage:
-  # - Compressed data stays in read-only binary section
+  # - Embedded data stays in read-only binary section
   # - Decompression happens on-demand during read
   # - No heap allocation unless content is explicitly stored
   #
@@ -90,15 +90,20 @@ module BakedFileSystem
     # Returns the SHA-256 digest of the source file if this file was baked from disk.
     getter digest : String?
 
-    # Returns whether this file is compressed. If not, it is decompressed on read.
+    # Returns whether this file is already compressed content, such as a `.gz` file.
     getter? compressed : Bool
 
-    @closed : Bool = false
+    # Returns whether the embedded bytes are gzip-compressed for storage.
+    getter? stored_compressed : Bool
 
-    def initialize(@path, @size, @compressed, @slice : Bytes, @modification_time : Time? = nil, @digest : String? = nil)
+    @closed : Bool = false
+    @wrapped_io : IO
+
+    def initialize(@path, @size, @compressed, @slice : Bytes, stored_compressed : Bool? = nil, @modification_time : Time? = nil, @digest : String? = nil)
       @path = "/" + @path unless @path.starts_with? '/'
+      @stored_compressed = stored_compressed.nil? ? !@compressed : stored_compressed
       @memory_io = IO::Memory.new(@slice)
-      @wrapped_io = compressed? ? @memory_io : Compress::Gzip::Reader.new(@memory_io)
+      @wrapped_io = stored_compressed? ? Compress::Gzip::Reader.new(@memory_io) : @memory_io
     end
 
     def read(slice : Bytes)
@@ -106,9 +111,9 @@ module BakedFileSystem
       @wrapped_io.read(slice)
     end
 
-    # Returns the compressed size of this virtual file.
+    # Returns the stored size of this virtual file.
     #
-    # See `#size` for the real size of the (uncompressed) file.
+    # See `#size` for the real size of the original file.
     def compressed_size
       @slice.bytesize
     end
@@ -155,7 +160,7 @@ module BakedFileSystem
     def rewind
       check_open
       @memory_io.rewind
-      @wrapped_io = compressed? ? @memory_io : Compress::Gzip::Reader.new(@memory_io)
+      reset_wrapped_io
       nil
     end
 
@@ -184,8 +189,12 @@ module BakedFileSystem
       raise IO::Error.new("Closed stream") if @closed
     end
 
-    # Returns a `Bytes` holding the (compressed) content of this virtual file.
-    # This data needs to be extracted using a `Compress::Gzip::Reader` unless `#compressed?` is true.
+    private def reset_wrapped_io
+      @wrapped_io = stored_compressed? ? Compress::Gzip::Reader.new(@memory_io) : @memory_io
+    end
+
+    # Returns a `Bytes` holding the embedded content of this virtual file.
+    # This data needs to be extracted using a `Compress::Gzip::Reader` if `#stored_compressed?` is true.
     def to_slice : Bytes
       @slice
     end
@@ -284,7 +293,7 @@ module BakedFileSystem
     return nil unless template
 
     # Create a new instance to ensure thread safety and independent state
-    BakedFile.new(template.path, template.size, template.compressed?, template.to_slice, template.modification_time, template.digest)
+    BakedFile.new(template.path, template.size, template.compressed?, template.to_slice, template.stored_compressed?, template.modification_time, template.digest)
   end
 
   # Opens a file and yields it to the block, ensuring it's closed afterwards.
@@ -315,8 +324,8 @@ module BakedFileSystem
     @@files = [] of BakedFileSystem::BakedFile
     @@paths = Set(String).new
 
-    macro bake_folder(path, dir = __DIR__, allow_empty = false, include_dotfiles = false, include_patterns = nil, exclude_patterns = nil, max_size = nil)
-      BakedFileSystem.bake_folder(\{{ path }}, \{{ dir }}, \{{ allow_empty }}, \{{ include_dotfiles }}, \{{ include_patterns }}, \{{ exclude_patterns }}, \{{ max_size }})
+    macro bake_folder(path, dir = __DIR__, allow_empty = false, include_dotfiles = false, include_patterns = nil, exclude_patterns = nil, max_size = nil, compress = true)
+      BakedFileSystem.bake_folder(\{{ path }}, \{{ dir }}, \{{ allow_empty }}, \{{ include_dotfiles }}, \{{ include_patterns }}, \{{ exclude_patterns }}, \{{ max_size }}, \{{ compress }})
     end
 
     def self.add_baked_file(file : BakedFileSystem::BakedFile)
@@ -351,8 +360,9 @@ module BakedFileSystem
   # It will raise if there are no files found in *path* unless *allow_empty* is set to `true`.
   # The *include_patterns* parameter accepts an array of glob patterns to include specific files.
   # The *exclude_patterns* parameter accepts an array of glob patterns to exclude specific files.
-  # The *max_size* parameter can be used to enforce a maximum total compressed size limit (in bytes).
-  macro bake_folder(path, dir = __DIR__, allow_empty = false, include_dotfiles = false, include_patterns = nil, exclude_patterns = nil, max_size = nil)
+  # The *max_size* parameter can be used to enforce a maximum total stored size limit (in bytes).
+  # The *compress* parameter can be set to `false` to store files without gzip compression.
+  macro bake_folder(path, dir = __DIR__, allow_empty = false, include_dotfiles = false, include_patterns = nil, exclude_patterns = nil, max_size = nil, compress = true)
     {% raise "BakedFileSystem.load expects `path` to be a StringLiteral." unless path.is_a?(StringLiteral) %}
 
     %files_size_ante = @@files.size
@@ -374,9 +384,9 @@ module BakedFileSystem
         {% json_parts << "\"exclude\":null" %}
       {% end %}
       {% filter_json = "{" + json_parts.join(",") + "}" %}
-      {{ run("./loader", path, dir, include_dotfiles, filter_json, max_size || "nil") }}
+      {{ run("./loader", path, dir, include_dotfiles, filter_json, max_size || "nil", compress) }}
     {% else %}
-      {{ run("./loader", path, dir, include_dotfiles, "nil", max_size || "nil") }}
+      {{ run("./loader", path, dir, include_dotfiles, "nil", max_size || "nil", compress) }}
     {% end %}
 
     {% unless allow_empty %}

@@ -26,6 +26,11 @@ class StorageWithHidden
   bake_folder "./storage", include_dotfiles: true
 end
 
+class StorageWithoutCompression
+  extend BakedFileSystem
+  bake_folder "./storage", compress: false
+end
+
 class EmptyStorage
   extend BakedFileSystem
   bake_folder "./empty_storage", allow_empty: true
@@ -406,6 +411,17 @@ describe BakedFileSystem do
   end
 
   describe "compression edge cases" do
+    it "stores files as raw bytes when compression is disabled" do
+      path = "lorem.txt"
+      file = StorageWithoutCompression.get(path)
+      original_path = File.expand_path(File.join(__DIR__, "storage", path))
+
+      file.compressed?.should be_false
+      file.compressed_size.should eq(file.size)
+      file.to_slice.should eq(read_slice(original_path))
+      file.gets_to_end.should eq(File.read(original_path))
+    end
+
     it "handles .gz files without double compression" do
       # We have string_encoding/interpolation.gz in storage
       file = Storage.get("string_encoding/interpolation.gz")
