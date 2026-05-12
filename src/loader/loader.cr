@@ -1,5 +1,6 @@
 require "base64"
 require "compress/gzip"
+require "digest/sha256"
 require "./string_encoder"
 require "./stats"
 require "./byte_counter"
@@ -116,7 +117,8 @@ module BakedFileSystem
 
       files.each do |path|
         relative_path = Path[path[root_path_length..]].to_posix.to_s
-        uncompressed_size = File.info(path).size
+        file_info = File.info(path)
+        uncompressed_size = file_info.size
 
         io << "bake_file BakedFileSystem::BakedFile.new(\n"
         io << "  path:            " << relative_path.dump << ",\n"
@@ -126,6 +128,8 @@ module BakedFileSystem
 
         io << "  compressed:      " << compressed << ",\n"
         io << "  stored_compressed: " << stored_compressed << ",\n"
+        io << "  modification_time: Time.unix(" << file_info.modification_time.to_unix << "),\n"
+        io << "  digest:          " << file_digest(path).dump << ",\n"
 
         File.open(path, "rb") do |file|
           io << "  slice:         \""
@@ -157,6 +161,21 @@ module BakedFileSystem
         stats.report_to(STDERR, max_size)
       rescue ex : Stats::SizeExceededError
         exit(1)
+      end
+    end
+
+    private def self.file_digest(path : String) : String
+      Digest::SHA256.hexdigest do |digest|
+        File.open(path, "rb") do |file|
+          buffer = Bytes.new(8192)
+
+          loop do
+            bytes_read = file.read(buffer)
+            break if bytes_read == 0
+
+            digest.update(buffer[0, bytes_read])
+          end
+        end
       end
     end
   end

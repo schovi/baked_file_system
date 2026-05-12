@@ -150,6 +150,25 @@ describe BakedFileSystem do
     io.size.should eq(sz)
   end
 
+  it "exposes raw compressed bytes" do
+    file = Storage.get("lorem.txt")
+
+    file.raw.should eq(file.to_slice)
+
+    raw_io = file.raw_io
+    raw_io.gets_to_end.to_slice.should eq(file.raw)
+  end
+
+  it "keeps source modification time for files baked from disk" do
+    Storage.get("lorem.txt").modification_time.should_not be_nil
+    ManualStorage.get("hello-world.txt").modification_time.should be_nil
+  end
+
+  it "keeps source digest for files baked from disk" do
+    Storage.get("lorem.txt").digest.should_not be_nil
+    ManualStorage.get("hello-world.txt").digest.should be_nil
+  end
+
   it "handles interpolation in content" do
     String.new(Storage.get("string_encoding/interpolation.gz").to_slice).should eq "\#{foo} {% macro %}\n"
   end
@@ -398,6 +417,7 @@ describe BakedFileSystem do
       original_path = File.expand_path(File.join(__DIR__, "storage", path))
 
       file.compressed?.should be_false
+      file.stored_compressed?.should be_false
       file.compressed_size.should eq(file.size)
       file.to_slice.should eq(read_slice(original_path))
       file.gets_to_end.should eq(File.read(original_path))
