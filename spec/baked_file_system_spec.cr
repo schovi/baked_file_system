@@ -72,6 +72,11 @@ class FilteredStorageEmpty
   bake_folder "./storage/filters", include_patterns: ["**/*.txt"], allow_empty: true
 end
 
+class FilteredStorageEscapedPatterns
+  extend BakedFileSystem
+  bake_folder "./storage/filters", include_patterns: ["\u0000\u0001\u0002\u0003\u0004\u0005\u0006\a\b\t\n\v\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\e\u001c\u001d\u001e\u001f\"\\", "\#{literal} 😀"], allow_empty: true
+end
+
 # This should raise an error at compile time - patterns match nothing and allow_empty is false
 # Commented out because it would prevent compilation
 # class FilteredStorageEmptyError
@@ -88,6 +93,10 @@ def read_slice(path)
 end
 
 describe BakedFileSystem do
+  it "preserves control characters in filter patterns" do
+    FilteredStorageEscapedPatterns.files.should be_empty
+  end
+
   it "load only files without hidden one" do
     Storage.files.size.should eq(10) # lorem.txt, images/sidekiq.png, string_encoding/*, filters/*
     Storage.get?(".hidden/hidden_file.txt").should be_nil

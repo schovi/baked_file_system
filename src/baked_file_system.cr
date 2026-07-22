@@ -367,27 +367,25 @@ module BakedFileSystem
 
     %files_size_ante = @@files.size
 
-    # Serialize filter patterns as JSON for passing to loader process
-    {% if include_patterns || exclude_patterns %}
-      # Build JSON string manually at compile time
-      {% json_parts = [] of String %}
-      {% if include_patterns %}
-        {% include_json = "\"include\":[" + include_patterns.map { |p| "\"" + p + "\"" }.join(",") + "]" %}
-        {% json_parts << include_json %}
-      {% else %}
-        {% json_parts << "\"include\":null" %}
+    {% include_payload = "nil" %}
+    {% if include_patterns %}
+      {% include_payload = "" %}
+      {% for pattern in include_patterns %}
+        {% escaped_pattern = pattern.gsub(/\\/, "\\\\\\\\").gsub(/\x00/, "\\\\0") %}
+        {% include_payload += escaped_pattern.size.stringify + ":" + escaped_pattern %}
       {% end %}
-      {% if exclude_patterns %}
-        {% exclude_json = "\"exclude\":[" + exclude_patterns.map { |p| "\"" + p + "\"" }.join(",") + "]" %}
-        {% json_parts << exclude_json %}
-      {% else %}
-        {% json_parts << "\"exclude\":null" %}
-      {% end %}
-      {% filter_json = "{" + json_parts.join(",") + "}" %}
-      {{ run("./loader", path, dir, include_dotfiles, filter_json, max_size || "nil", compress) }}
-    {% else %}
-      {{ run("./loader", path, dir, include_dotfiles, "nil", max_size || "nil", compress) }}
     {% end %}
+
+    {% exclude_payload = "nil" %}
+    {% if exclude_patterns %}
+      {% exclude_payload = "" %}
+      {% for pattern in exclude_patterns %}
+        {% escaped_pattern = pattern.gsub(/\\/, "\\\\\\\\").gsub(/\x00/, "\\\\0") %}
+        {% exclude_payload += escaped_pattern.size.stringify + ":" + escaped_pattern %}
+      {% end %}
+    {% end %}
+
+    {{ run("./loader", path, dir, include_dotfiles, include_payload, exclude_payload, max_size || "nil", compress) }}
 
     {% unless allow_empty %}
     raise "BakedFileSystem empty: no files in #{File.expand_path({{ path }}, {{ dir }})}" if @@files.size - %files_size_ante == 0

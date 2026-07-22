@@ -16,6 +16,58 @@ describe BakedFileSystem::Loader do
         BakedFileSystem::Loader.load(IO::Memory.new, File.expand_path(File.join(__DIR__, "spec_helper.cr")))
       end
     end
+
+    it "fails on malformed filter data" do
+      output = IO::Memory.new
+      error = IO::Memory.new
+      loader_path = File.expand_path(File.join(__DIR__, "../src/loader.cr"))
+
+      status = Process.run(
+        "crystal",
+        ["run", loader_path, "--", "storage", __DIR__, "false", "{", "nil", "nil"],
+        output: output,
+        error: error
+      )
+
+      status.success?.should be_false
+      error.to_s.should contain("Invalid filter patterns")
+    end
+
+    it "fails when filter data is missing" do
+      output = IO::Memory.new
+      error = IO::Memory.new
+      loader_path = File.expand_path(File.join(__DIR__, "../src/loader.cr"))
+
+      status = Process.run(
+        "crystal",
+        ["run", loader_path, "--", "storage", __DIR__, "false"],
+        output: output,
+        error: error
+      )
+
+      status.success?.should be_false
+      error.to_s.should contain("Missing filter patterns")
+    end
+
+    it "rejects symbolic links" do
+      root_path = File.tempname("baked-file-system-root")
+      target_path = File.tempname("baked-file-system-target")
+      Dir.mkdir(root_path)
+      File.write(target_path, "external")
+      link_path = File.join(root_path, "linked.txt")
+
+      begin
+        File.symlink(target_path, link_path)
+
+        expect_raises BakedFileSystem::Loader::Error, "not a regular file" do
+          BakedFileSystem::Loader.load(IO::Memory.new, root_path)
+        end
+      ensure
+        File.delete?(link_path)
+        Dir.delete(root_path)
+        File.delete?(target_path)
+      end
+    end
   end
 
   describe "successful loading" do
@@ -105,6 +157,31 @@ describe BakedFileSystem::Loader do
       code.should contain("/lorem.txt")
       code.should contain("/images/sidekiq.png")
     end
+
+    it "treats glob metacharacters in the root path literally" do
+      parent_path = File.tempname("baked-file-system-parent")
+      root_path = File.join(parent_path, "[assets]")
+      sibling_path = File.join(parent_path, "a")
+      Dir.mkdir_p(root_path)
+      Dir.mkdir_p(sibling_path)
+      File.write(File.join(root_path, "inside.txt"), "inside")
+      File.write(File.join(sibling_path, "outside.txt"), "outside")
+
+      begin
+        output = IO::Memory.new
+        BakedFileSystem::Loader.load(output, root_path)
+
+        code = output.to_s
+        code.should contain("/inside.txt")
+        code.should_not contain("outside.txt")
+      ensure
+        File.delete(File.join(root_path, "inside.txt"))
+        File.delete(File.join(sibling_path, "outside.txt"))
+        Dir.delete(root_path)
+        Dir.delete(sibling_path)
+        Dir.delete(parent_path)
+      end
+    end
   end
 
   describe "file content encoding" do
@@ -149,6 +226,42 @@ describe BakedFileSystem::Loader do
 
       # Should generate code for the files
       stdout.to_s.should contain("BakedFile.new")
+    end
+
+    it "rejects a known oversized file before emitting code" do
+      root_path = File.tempname("baked-file-system-size")
+      Dir.mkdir(root_path)
+      file_path = File.join(root_path, "large.gz")
+      File.write(file_path, "already compressed")
+      output = IO::Memory.new
+
+      begin
+        expect_raises BakedFileSystem::Loader::Stats::SizeExceededError do
+          BakedFileSystem::Loader.load(output, root_path, max_size: 1_i64)
+        end
+        output.to_s.should be_empty
+      ensure
+        File.delete(file_path)
+        Dir.delete(root_path)
+      end
+    end
+
+    it "stops compressing when a file exceeds max_size" do
+      root_path = File.tempname("baked-file-system-size")
+      Dir.mkdir(root_path)
+      file_path = File.join(root_path, "large.txt")
+      File.write(file_path, "uncompressed content")
+      output = IO::Memory.new
+
+      begin
+        expect_raises BakedFileSystem::Loader::Stats::SizeExceededError do
+          BakedFileSystem::Loader.load(output, root_path, max_size: 1_i64)
+        end
+        output.to_s.should be_empty
+      ensure
+        File.delete(file_path)
+        Dir.delete(root_path)
+      end
     end
   end
 end
