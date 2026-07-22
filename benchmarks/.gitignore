@@ -3,7 +3,5 @@
 /baseline/baseline
 /baked/lib/
 /baseline/lib/
-/baked/shard.lock
-/baseline/shard.lock
 /results/*.json
 /results/*.md

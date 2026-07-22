@@ -10,6 +10,20 @@ module BakedFileSystem
     class Error < Exception
     end
 
+    private class SizeLimitedBuffer < IO::Memory
+      def initialize(@max_size : Int64, @previous_size : Int64)
+        super()
+      end
+
+      def write(slice : Bytes) : Nil
+        if @previous_size + size + slice.size > @max_size
+          raise Stats::SizeExceededError.new("Embedded files exceed max_size of #{@max_size} bytes")
+        end
+
+        super
+      end
+    end
+
     # Converts a glob pattern to a regular expression
     # Supports: * (any chars), ** (recursive dirs), ? (single char)
     private def self.glob_to_regex(pattern : String) : Regex
@@ -83,9 +97,12 @@ module BakedFileSystem
     end
 
     def self.load(io, root_path, include_dotfiles = false, include_patterns : Array(String)? = nil, exclude_patterns : Array(String)? = nil, max_size : Int64? = nil, compress = true)
-      if !File.exists?(root_path)
+      root_info = File.info?(root_path, follow_symlinks: false)
+      if !root_info
         raise Error.new "path does not exist: #{root_path}"
-      elsif !File.directory?(root_path)
+      elsif root_info.symlink?
+        raise Error.new "path is a symbolic link: #{root_path}"
+      elsif !root_info.directory?
         raise Error.new "path is not a directory: #{root_path}"
       elsif !File::Info.readable?(root_path)
         raise Error.new "path is not readable: #{root_path}"
@@ -96,10 +113,19 @@ module BakedFileSystem
       result = [] of String
 
       stats = Stats.new
+      effective_max_size = max_size || ENV["BAKED_FILE_SYSTEM_MAX_SIZE"]?.try(&.to_i64?) || Stats::DEFAULT_MAX_SIZE
 
-      pattern = Path[root_path].to_posix.join("**", "*").to_s
+      escaped_root_path = Path[root_path].to_posix.to_s.gsub(/[*?\[\]{}\\]/) { |character| "\\#{character}" }
+      pattern = "#{escaped_root_path}#{"/" unless escaped_root_path.ends_with?('/')}**/*"
       match_opt = include_dotfiles ? File::MatchOptions::DotFiles : File::MatchOptions.glob_default
-      files = Dir.glob(pattern, match: match_opt).reject { |path| File.directory?(path) }
+      files = [] of String
+      Dir.glob(pattern, match: match_opt).each do |path|
+        info = File.info(path, follow_symlinks: false)
+        next if info.directory?
+        raise Error.new("not a regular file: #{path}") unless info.file?
+
+        files << path
+      end
 
       # Apply filtering if include or exclude patterns are provided
       if include_patterns || exclude_patterns
@@ -117,51 +143,51 @@ module BakedFileSystem
 
       files.each do |path|
         relative_path = Path[path[root_path_length..]].to_posix.to_s
-        file_info = File.info(path)
+        file_info = File.info(path, follow_symlinks: false)
+        raise Error.new("not a regular file: #{path}") unless file_info.file?
+
         uncompressed_size = file_info.size
+        compressed = path.ends_with?("gz")
+        stored_compressed = compress && !compressed
+
+        if !stored_compressed && stats.total_compressed + uncompressed_size > effective_max_size
+          raise Stats::SizeExceededError.new("Embedded files exceed max_size of #{effective_max_size} bytes")
+        end
+
+        buffer = SizeLimitedBuffer.new(effective_max_size, stats.total_compressed)
+        File.open(path, "rb") do |file|
+          if stored_compressed
+            Compress::Gzip::Writer.open(buffer) do |writer|
+              IO.copy file, writer
+            end
+          else
+            IO.copy file, buffer
+          end
+        end
+        stored_size = buffer.size.to_i64
 
         io << "bake_file BakedFileSystem::BakedFile.new(\n"
         io << "  path:            " << relative_path.dump << ",\n"
         io << "  size:            " << uncompressed_size << ",\n"
-        compressed = path.ends_with?("gz")
-        stored_compressed = compress && !compressed
-
         io << "  compressed:      " << compressed << ",\n"
         io << "  stored_compressed: " << stored_compressed << ",\n"
         io << "  modification_time: Time.unix(" << file_info.modification_time.to_unix << "),\n"
         io << "  digest:          " << file_digest(path).dump << ",\n"
 
-        File.open(path, "rb") do |file|
-          io << "  slice:         \""
-          stored_size = 0_i64
-
-          StringEncoder.open(io) do |encoder|
-            stored_byte_counter = ByteCounter.new(encoder)
-
-            if stored_compressed
-              Compress::Gzip::Writer.open(stored_byte_counter) do |writer|
-                IO.copy file, writer
-              end
-            else
-              IO.copy file, stored_byte_counter
-            end
-
-            stored_size = stored_byte_counter.count
-          end
-
-          io << "\".to_slice,\n"
-          stats.add_file(relative_path, uncompressed_size, stored_size)
+        io << "  slice:         \""
+        buffer.rewind
+        StringEncoder.open(io) do |encoder|
+          IO.copy buffer, encoder
         end
+        io << "\".to_slice,\n"
+
+        stats.add_file(relative_path, uncompressed_size, stored_size)
 
         io << ")\n"
         io << "\n"
       end
 
-      begin
-        stats.report_to(STDERR, max_size)
-      rescue ex : Stats::SizeExceededError
-        exit(1)
-      end
+      stats.report_to(STDERR, max_size)
     end
 
     private def self.file_digest(path : String) : String
