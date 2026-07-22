@@ -6,7 +6,7 @@ shards:
 
   baked_file_system:
     path: ../..
-    version: 0.14.0
+    version: 0.14.1
 
   exception_page:
     git: https://github.com/crystal-loot/exception_page.git

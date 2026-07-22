@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.1] - 2026-07-22
+
+### Security
+- Reject symbolic-link roots and non-regular directory entries during compile-time baking
+- Treat glob metacharacters in source paths literally, preserve filter pattern characters, and fail on malformed filter data
+- Enforce stored-size limits before emitting generated code, including while compression is in progress
+- Restrict CI permissions, pin third-party actions, disable persisted credentials, and document private vulnerability reporting
+
 ## [0.14.0] - 2026-05-12
 
 ### Added
@@ -97,6 +105,7 @@ This feature prevents accidental inclusion of huge files that bloat binary size.
 
 For changes in versions 0.9.x and earlier, see git history.
 
+[0.14.1]: https://github.com/schovi/baked_file_system/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/schovi/baked_file_system/compare/v0.13.0...v0.14.0
 [0.12.0]: https://github.com/schovi/baked_file_system/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/schovi/baked_file_system/compare/v0.10.0...v0.11.0
